@@ -36,7 +36,7 @@ class TransE(Decoder):
         return -((head + rel) - tail).norm(p=1.0, dim=-1)
 
 
-class DistMult(torch.nn.Module):
+class DistMult(Decoder):
     def __init__(self, num_relations, hidden_channels):
         super().__init__(num_relations, hidden_channels)
     

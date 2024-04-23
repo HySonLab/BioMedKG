@@ -1,0 +1,4 @@
+pydantic_settings==2.2.1
+torch==2.2.2
+torch_geometric==2.5.3
+tqdm==4.65.0

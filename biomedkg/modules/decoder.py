@@ -6,7 +6,7 @@ import torch.nn.functional as F
 class Decoder(torch.nn.Module):
     def __init__(self, num_relations, hidden_channels):
         super().__init__()
-        self.rel_emb = torch.nn.Embedding(num_embeddings=num_relations, embedding_dim=hidden_channels, sparse=True)
+        self.rel_emb = torch.nn.Parameter(torch.empty(num_relations, hidden_channels))
         self.reset_parameters()
 
     def reset_parameters(self):

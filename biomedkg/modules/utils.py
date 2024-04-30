@@ -1,4 +1,6 @@
+import os
 import re
+from biomedkg.configs import kge_train_settings
 from typing import Any
 
 def clean_name(input_string) -> str:
@@ -20,3 +22,10 @@ def format_time(duration):
     hours, remainder = divmod(duration, 3600)
     minutes, seconds = divmod(remainder, 60)
     return "{:02}:{:02}:{:02}".format(int(hours), int(minutes), int(seconds))
+
+
+def find_comet_api_key():
+    if "COMET_API_KEY" in os.environ:
+        return os.environ['COMET_API_KEY']
+
+    return None

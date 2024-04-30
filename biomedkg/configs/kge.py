@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class KGESetting(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env-kge", extra="allow")
+    model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
     ENCODER_MODEL_NAME : str
     DECODER_MODEL_NAME : str

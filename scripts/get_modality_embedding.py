@@ -1,9 +1,11 @@
 import os
 import yaml
+import glob
 import pickle
 import pandas as pd
-from tqdm.auto import tqdm
 from typing import List
+from pathlib import Path
+from tqdm.auto import tqdm
 
 from biomedkg.modules.utils import generator
 from biomedkg.modules.node import NodeEmbedding
@@ -75,3 +77,29 @@ if __name__ == "__main__":
         else:
             entity = data[entity_type]
             get_feature(**entity)
+
+    # Merge amino_acid and dna for gene/protein  
+    embed_path = "data/embed"
+    pickle_files = glob.glob(embed_path + "/protein*pickle")  
+
+    protein_desc = dict()
+    protein_seq = dict()
+
+    for pickle_file in pickle_files:
+        file_name = Path(pickle_file).stem
+        modality_name = file_name.split("_")[-2]
+
+        with open(pickle_file, "rb") as file:
+            data = pickle.load(file=file)
+
+        if modality_name == "desc":
+            protein_desc.update(data)
+        else:
+            protein_seq.update(data)
+
+    with open(os.path.join(embed_path, "gene_seq_proteinbert_dna_bert.pickle"), "wb") as file:
+        pickle.dump(protein_seq, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with open(os.path.join(embed_path, "gene_desc_biobert"), "wb") as file:
+        pickle.dump(protein_desc, file, protocol=pickle.HIGHEST_PROTOCOL)
+            

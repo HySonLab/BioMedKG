@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.9"
 dependencies = [
     "pydantic_settings==2.2.1", "tqdm==4.65.0", "polars==0.20.22", "PyTDC==0.4.12",
-    "torch==2.2.2", "torch_geometric==2.5.3", "faiss-cpu==1.8.0",
+    "torch==2.2.2", "torch_geometric==2.5.3", "faiss-cpu==1.8.0","einops==0.8.0",
     "transformers==4.39.0","accelerate==0.29.3","lightning==2.2.3",
     "comet-ml==3.41.0",
 ]

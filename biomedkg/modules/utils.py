@@ -29,3 +29,12 @@ def find_comet_api_key():
         return os.environ['COMET_API_KEY']
 
     return None
+
+
+def generator(data:list[str], batch_size:int):
+    total_samples = len(data)
+    for i in range(0, total_samples, batch_size):
+        if i + batch_size < total_samples:
+            yield data[i:i + batch_size]
+        else:
+            yield data[i:]

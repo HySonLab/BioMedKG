@@ -100,6 +100,6 @@ if __name__ == "__main__":
     with open(os.path.join(embed_path, "gene_seq_proteinbert_dna_bert.pickle"), "wb") as file:
         pickle.dump(protein_seq, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-    with open(os.path.join(embed_path, "gene_desc_biobert"), "wb") as file:
+    with open(os.path.join(embed_path, "gene_desc_biobert.pickle"), "wb") as file:
         pickle.dump(protein_desc, file, protocol=pickle.HIGHEST_PROTOCOL)
             

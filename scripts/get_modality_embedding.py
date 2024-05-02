@@ -8,7 +8,7 @@ from pathlib import Path
 from tqdm.auto import tqdm
 
 from biomedkg.modules.utils import generator
-from biomedkg.modules.node import NodeEmbedding
+from biomedkg.modules.embed import NodeEmbedding
 
 def get_feature(
         file_name : str,

@@ -53,7 +53,7 @@ class PrimeKG:
 
     def get_data(self,):
         self._build_node_embedding()
-        self._buil_edge_index()
+        self._build_edge_index()
         return self.data.to_homogeneous()
     
 
@@ -78,7 +78,7 @@ class PrimeKG:
             node_type = clean_name(node_type)
             self.data[node_type].x = embedding
         
-    def _buil_edge_index(self,):
+    def _build_edge_index(self,):
         for relation_type in tqdm(self.list_edges, desc="Load edge"):
             relation_df = self.df[self.df['relation'] == relation_type][['x_type', 'x_name', 'relation', 'y_type', 'y_name']]
             triples = relation_df[["x_type", "relation", "y_type"]].drop_duplicates().values

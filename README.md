@@ -26,6 +26,8 @@
 
 * Lightning modules (Data module, Model module) are prepared in [biomedkg](biomedkg), check [data_module](biomedkg/data_module.py) and [kge_module](biomedkg/kge_module.py) for examples.
 
+* All scripts should be created inside [scripts](scripts) folder.
+
 ## Setup
 
 ### Prepare data

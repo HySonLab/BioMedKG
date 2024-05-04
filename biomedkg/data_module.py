@@ -1,6 +1,7 @@
 from lightning import LightningDataModule
 import torch_geometric.transforms as T
-from torch_geometric.loader import GraphSAINTRandomWalkSampler
+from torch_geometric.loader import GraphSAINTRandomWalkSampler, NeighborLoader
+from typing import Callable
 
 from biomedkg.modules.data import PrimeKG
 
@@ -14,6 +15,7 @@ class PrimeKGModule(LightningDataModule):
             val_ratio : float,
             test_ratio : float,
             num_steps : int,
+            encoder : Callable = None
             ):
         super().__init__()
         self.save_hyperparameters()
@@ -24,12 +26,14 @@ class PrimeKGModule(LightningDataModule):
         self.test_ratio = test_ratio
         self.num_steps = num_steps
         self.batch_size = batch_size
+        self.encoder = encoder
 
     def setup(self, stage : str = None):
         primekg = PrimeKG(
             data_dir=self.data_dir,
             process_node_lst=self.process_node_lst,
             process_edge_lst=self.process_edge_lst,
+            encoder=self.encoder
         )
 
         self.data = primekg.get_data()

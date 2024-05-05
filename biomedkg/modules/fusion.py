@@ -11,13 +11,9 @@ class AttentionFusion(nn.Module):
     def __init__(self,
                  embed_dim : int,
                  norm : bool = True,
-                 aggr : str = "mean"
                  ):
         super().__init__()
 
-        assert aggr in ["mean", "sum", "concat"], "Only mean, sum, and concat aggregation functions are supported."
-
-        self.aggr = aggr
         self.norm = norm
         self.embed_dim = embed_dim
 
@@ -47,15 +43,6 @@ class AttentionFusion(nn.Module):
             key=k,
             value=v,
         )
-
-        if self.aggr == "mean":
-            x = torch.mean(x, dim=1)
-        elif self.aggr == "max":
-            x = torch.max(x, dim=1)
-        elif self.aggr == "sum":
-            x = torch.sum(x, dim=1)
-        else:
-            x = x.view(batch_size, -1)
         
         return x
 

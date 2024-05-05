@@ -45,9 +45,16 @@ This command extracts embeddings for each modality. Refer to [modality.yaml](./m
 python scripts/get_modality_embedding.py
 ```
 
-## Knowledge Graph Embedding
+## Train
 You should ```export COMET_API_KEY=<your-comet-api-key>``` to track the training process on Comet dash board, otherwise it will be recorded in `log` folder.
 
+Run the following scripts with the flag `-h` for more information.
+### Graph Contrastive Learning
+To train a graph on contrastive learning with intra-node type, for example, with `gene`, try:
+```
+python scripts/train_gcl.py --node_type gene
+```
+### Knowledge Graph Embedding
 Run the following command to execute Knowledge Graph Embedding task
 ```
 python scripts/train_kge.py

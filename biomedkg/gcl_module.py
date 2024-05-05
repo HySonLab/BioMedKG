@@ -6,7 +6,7 @@ from lightning import LightningModule
 from torch_geometric.nn import DeepGraphInfomax
 from transformers.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
-from biomedkg.modules import GCNEncoder, AttentionFusion
+from biomedkg.modules import GCNEncoder
 
 class DGIModule(LightningModule):
     def __init__(self,

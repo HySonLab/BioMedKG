@@ -10,6 +10,7 @@ from biomedkg.gcl_module import DGIModule
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.modules.utils import find_comet_api_key
+from biomedkg.modules import AttentionFusion
 from biomedkg.configs import kge_train_settings, kge_settings, data_settings
 
 
@@ -32,6 +33,23 @@ def parse_opt():
              help="Train contrastive learning on which node type")
         
         parser.add_argument(
+             '--modality_transform', 
+             type=str, 
+             action='store', 
+             default=None,
+             choices=['attention', None], 
+             help="Fusion module to apply on modalities embedding")
+
+        parser.add_argument(
+             '--modality_merging', 
+             type=str, 
+             action='store', 
+             default='mean',
+             choices=['mean', 'sum', 'concat'], 
+             help="Modalities merging function")
+        
+        
+        parser.add_argument(
              '--ckpt', 
              type=str, 
              default=None,
@@ -41,7 +59,12 @@ def parse_opt():
         return opt
 
 
-def main(task:str, node_type:str, ckpt:str = None):
+def main(
+          task:str, 
+          node_type:str, 
+          modality_transform: str,
+          modality_merging: str,
+          ckpt:str = None):
     print(f"Graph Contrastive Learning on {node_type}")
 
     seed_everything(kge_train_settings.SEED)
@@ -64,11 +87,21 @@ def main(task:str, node_type:str, ckpt:str = None):
 
     data_module.setup()
 
+    if modality_transform == "attention":
+        modality_fuser = AttentionFusion(
+                embed_dim=kge_settings.IN_DIMS,
+                norm=True,
+            )
+    else:
+        modality_fuser = None
+
     model = DGIModule(
         in_dim=kge_settings.IN_DIMS,
         hidden_dim=kge_settings.HIDDEN_DIM,
         out_dim=kge_settings.OUT_DIM,
         num_hidden_layers=kge_settings.NUM_HIDDEN,
+        modality_fuser=modality_fuser,
+        modality_aggr=modality_merging,
         scheduler_type=kge_train_settings.SCHEDULER_TYPE,
         learning_rate=kge_train_settings.LEARNING_RATE,
         warm_up_ratio=kge_train_settings.WARM_UP_RATIO,

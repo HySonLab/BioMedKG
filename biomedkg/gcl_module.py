@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 import torch
 from lightning import LightningModule
@@ -14,20 +14,21 @@ class DGIModule(LightningModule):
                  hidden_dim : int,
                  out_dim : int,
                  num_hidden_layers : int,
+                 modality_fuser: Callable = None,
+                 modality_aggr: str = "mean",
                  scheduler_type : str = "cosine",
                  learning_rate: float = 2e-4,
                  warm_up_ratio: float = 0.03,
                  ):
         super().__init__()
         assert scheduler_type in ["linear", "cosine"], "Only support 'cosine' and 'linear'"
+        assert modality_aggr in ["mean", "sum", "concat"], "Only mean, sum, and concat aggregation functions are supported."
 
         self.save_hyperparameters()
 
-        self.modality_fuser = AttentionFusion(
-            embed_dim=in_dim,
-            norm=True,
-            aggr="mean",
-        )
+        self.feature_embedding_dim = in_dim
+        self.modality_fuser = modality_fuser
+        self.modality_aggr = modality_aggr
 
         self.model = DeepGraphInfomax(
             hidden_channels=hidden_dim,
@@ -46,12 +47,40 @@ class DGIModule(LightningModule):
         self.warm_up_ratio = warm_up_ratio
     
     def forward(self, x, edge_index):
-        x = self.modality_fuser(x)
+
+        # Reshape if does not apply fusion transformation
+        if self.modality_fuser is None:
+            x = x.view(x.size(0), -1, self.feature_embedding_dim)
+        else:
+            x = self.modality_fuser(x)
+
+        if self.modality_aggr == "mean":
+            x = torch.mean(x, dim=1)
+        elif self.modality_aggr == "sum":
+            x = torch.sum(x, dim=1)
+        else:
+            x = x.view(x.size(0), -1)      
+
         z = self.model.encoder(x, edge_index)
+
         return z
     
     def training_step(self, batch):
-        x = self.modality_fuser(batch.x)
+
+        # Reshape if does not apply transformation
+        if self.modality_fuser is None:
+            x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+        else:
+            x = self.modality_fuser(batch.x)
+
+        # Modalities fusion
+        if self.modality_aggr == "mean":
+            x = torch.mean(x, dim=1)
+        elif self.modality_aggr == "sum":
+            x = torch.sum(x, dim=1)
+        else:
+            x = x.view(x.size(0), -1)
+
         pos_z, neg_z, summary = self.model(x, batch.edge_index)
         loss = self.model.loss(pos_z, neg_z, summary)
 
@@ -59,7 +88,21 @@ class DGIModule(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.modality_fuser(batch.x)
+
+        # Reshape if does not apply transformation
+        if self.modality_fuser is None:
+            x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+        else:
+            x = self.modality_fuser(batch.x)
+
+        # Modalities fusion
+        if self.modality_aggr == "mean":
+            x = torch.mean(x, dim=1)
+        elif self.modality_aggr == "sum":
+            x = torch.sum(x, dim=1)
+        else:
+            x = x.view(x.size(0), -1)
+
         pos_z, neg_z, summary = self.model(x, batch.edge_index)
         loss = self.model.loss(pos_z, neg_z, summary)
 
@@ -67,7 +110,21 @@ class DGIModule(LightningModule):
         return loss
     
     def test_step(self, batch, batch_idx):
-        x = self.modality_fuser(batch.x)
+
+        # Reshape if does not apply transformation
+        if self.modality_fuser is None:
+            x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+        else:
+            x = self.modality_fuser(batch.x)
+
+        # Modalities fusion
+        if self.modality_aggr == "mean":
+            x = torch.mean(x, dim=1)
+        elif self.modality_aggr == "sum":
+            x = torch.sum(x, dim=1)
+        else:
+            x = x.view(x.size(0), -1)
+
         pos_z, neg_z, summary = self.model(x, batch.edge_index)
         loss = self.model.loss(pos_z, neg_z, summary)
 

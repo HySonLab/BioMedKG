@@ -14,7 +14,6 @@ class PrimeKGModule(LightningDataModule):
             batch_size : int,
             val_ratio : float,
             test_ratio : float,
-            num_steps : int,
             encoder : Callable = None
             ):
         super().__init__()
@@ -24,7 +23,6 @@ class PrimeKGModule(LightningDataModule):
         self.process_edge_lst = process_edge_lst
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
-        self.num_steps = num_steps
         self.batch_size = batch_size
         self.encoder = encoder
 

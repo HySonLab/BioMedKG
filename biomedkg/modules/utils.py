@@ -1,6 +1,5 @@
 import os
 import re
-from biomedkg.configs import kge_train_settings
 from typing import Any
 
 def clean_name(input_string) -> str:

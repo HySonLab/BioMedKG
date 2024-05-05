@@ -11,7 +11,7 @@ from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.modules.utils import find_comet_api_key
 from biomedkg.modules import AttentionFusion
-from biomedkg.configs import kge_train_settings, kge_settings, data_settings
+from biomedkg.configs import train_settings, gcl_settings, data_settings
 
 
 def parse_opt():
@@ -67,7 +67,7 @@ def main(
           ckpt:str = None):
     print(f"Graph Contrastive Learning on {node_type}")
 
-    seed_everything(kge_train_settings.SEED)
+    seed_everything(train_settings.SEED)
 
     if node_type == "gene":
         process_node = ['gene/protein']
@@ -78,10 +78,9 @@ def main(
         data_dir=data_settings.DATA_DIR,
         process_node_lst=process_node,
         process_edge_lst=data_settings.EDGES_LST,
-        batch_size=kge_train_settings.BATCH_SIZE,
-        val_ratio=kge_train_settings.VAL_RATIO,
-        test_ratio=kge_train_settings.TEST_RATIO,
-        num_steps=kge_train_settings.STEP_PER_EPOCH,
+        batch_size=train_settings.BATCH_SIZE,
+        val_ratio=train_settings.VAL_RATIO,
+        test_ratio=train_settings.TEST_RATIO,
         encoder=EncodeNodeWithModality(entity_type=node_type, embed_path="./data/embed")
     )
 
@@ -89,26 +88,26 @@ def main(
 
     if modality_transform == "attention":
         modality_fuser = AttentionFusion(
-                embed_dim=kge_settings.IN_DIMS,
+                embed_dim=gcl_settings.GCL_IN_DIMS,
                 norm=True,
             )
     else:
         modality_fuser = None
 
     model = DGIModule(
-        in_dim=kge_settings.IN_DIMS,
-        hidden_dim=kge_settings.HIDDEN_DIM,
-        out_dim=kge_settings.OUT_DIM,
-        num_hidden_layers=kge_settings.NUM_HIDDEN,
+        in_dim=gcl_settings.GCL_IN_DIMS,
+        hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
+        out_dim=gcl_settings.GCL_OUT_DIM,
+        num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
         modality_fuser=modality_fuser,
         modality_aggr=modality_merging,
-        scheduler_type=kge_train_settings.SCHEDULER_TYPE,
-        learning_rate=kge_train_settings.LEARNING_RATE,
-        warm_up_ratio=kge_train_settings.WARM_UP_RATIO,
+        scheduler_type=train_settings.SCHEDULER_TYPE,
+        learning_rate=train_settings.LEARNING_RATE,
+        warm_up_ratio=train_settings.WARM_UP_RATIO,
     )
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=kge_train_settings.OUT_DIR, 
+        dirpath=train_settings.OUT_DIR, 
         monitor="val_loss", 
         save_top_k=3, 
         mode="min"
@@ -119,16 +118,16 @@ def main(
     logger = CometLogger(
         api_key=find_comet_api_key(),
         project_name=f"BioMedKG-GCL-{node_type}",
-        save_dir=kge_train_settings.LOG_DIR,
+        save_dir=train_settings.LOG_DIR,
         experiment_name=str(int(time.time())),
     )
 
     trainer = Trainer(
         accelerator="auto", 
         log_every_n_steps=10,
-        max_epochs=kge_train_settings.EPOCHS,
-        check_val_every_n_epoch=kge_train_settings.VAL_EVERY_N_EPOCH,
-        default_root_dir=kge_train_settings.OUT_DIR,
+        max_epochs=train_settings.EPOCHS,
+        check_val_every_n_epoch=train_settings.VAL_EVERY_N_EPOCH,
+        default_root_dir=train_settings.OUT_DIR,
         enable_checkpointing=True, 
         logger=logger, 
         callbacks=[checkpoint_callback, early_stopping], 

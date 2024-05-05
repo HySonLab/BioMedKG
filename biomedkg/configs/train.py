@@ -1,14 +1,13 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class TrainKGESetting(BaseSettings):
+class TrainSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
     VAL_RATIO : float
     TEST_RATIO : float
     BATCH_SIZE : int
     
-    STEP_PER_EPOCH : int
     LEARNING_RATE : float
     EPOCHS : int
     SCHEDULER_TYPE : str
@@ -19,4 +18,4 @@ class TrainKGESetting(BaseSettings):
     LOG_DIR : str
     VAL_EVERY_N_EPOCH : int
 
-kge_train_settings = TrainKGESetting()
+train_settings = TrainSettings()

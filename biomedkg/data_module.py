@@ -1,6 +1,6 @@
 from lightning import LightningDataModule
 import torch_geometric.transforms as T
-from torch_geometric.loader import GraphSAINTRandomWalkSampler, NeighborLoader
+from torch_geometric.loader import NeighborLoader
 from typing import Callable
 
 from biomedkg.modules.data import PrimeKG
@@ -46,31 +46,22 @@ class PrimeKGModule(LightningDataModule):
        
 
     def train_dataloader(self):
-        return GraphSAINTRandomWalkSampler(
-            data = self.train_data,
+        return NeighborLoader(
+            data=self.train_data,
             batch_size=self.batch_size,
-            walk_length=20,
-            num_steps=self.num_steps,
-            sample_coverage=100,
-            num_workers=0
+            num_neighbors=[30] * 3,
         )
 
     def val_dataloader(self):
-        return GraphSAINTRandomWalkSampler(
-            data = self.val_data,
+        return NeighborLoader(
+            data=self.val_data,
             batch_size=self.batch_size,
-            walk_length=20,
-            num_steps=self.num_steps,
-            sample_coverage=100,
-            num_workers=0
+            num_neighbors=[30] * 3,
         )
 
     def test_dataloader(self):
-        return GraphSAINTRandomWalkSampler(
-            data = self.test_data,
+        return NeighborLoader(
+            data=self.test_data,
             batch_size=self.batch_size,
-            walk_length=20,
-            num_steps=self.num_steps,
-            sample_coverage=100,
-            num_workers=0
+            num_neighbors=[30] * 3,
         )

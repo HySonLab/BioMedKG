@@ -26,7 +26,7 @@ class PrimeKGModule(LightningDataModule):
         self.batch_size = batch_size
         self.encoder = encoder
 
-    def setup(self, stage : str = None):
+    def setup(self, stage : str = "split"):
         primekg = PrimeKG(
             data_dir=self.data_dir,
             process_node_lst=self.process_node_lst,
@@ -36,12 +36,19 @@ class PrimeKGModule(LightningDataModule):
 
         self.data = primekg.get_data()
 
-        self.train_data, self.val_data, self.test_data = T.RandomLinkSplit(
-            num_val=self.val_ratio,
-            num_test=self.test_ratio,
-            neg_sampling_ratio=0.,
-        )(data=self.data)
+        if stage == "split":
+            self.train_data, self.val_data, self.test_data = T.RandomLinkSplit(
+                num_val=self.val_ratio,
+                num_test=self.test_ratio,
+                neg_sampling_ratio=0.,
+            )(data=self.data)
        
+    def all_dataloader(self):
+        return NeighborLoader(
+            data=self.data,
+            batch_size=self.batch_size,
+            num_neighbors=[30] * 3,
+        )
 
     def train_dataloader(self):
         return NeighborLoader(

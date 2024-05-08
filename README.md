@@ -52,7 +52,7 @@ Run the following scripts with the flag `-h` for more information.
 ### Graph Contrastive Learning
 To train a graph on contrastive learning with intra-node type, for example, with `gene`, try:
 ```
-python scripts/train_gcl.py --node_type gene
+python scripts/train_gcl.py --model_name ggd --node_type gene
 ```
 ### Knowledge Graph Embedding
 Run the following command to execute Knowledge Graph Embedding task

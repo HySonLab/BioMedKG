@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import argparse
 
 from lightning.pytorch import Trainer, seed_everything
@@ -60,8 +61,16 @@ def main(task:str, ckpt:str = None):
         warm_up_ratio=train_settings.WARM_UP_RATIO,
     )
 
+    ckpt_path = os.path.join(train_settings.OUT_DIR, "kge", f"{kge_settings.KGE_ENCODER_MODEL_NAME}_{kge_settings.KGE_DECODER_MODEL_NAME}_{int(time.time())}")
+
+    if not os.path.exists(ckpt_path):
+        os.makedirs(ckpt_path)
+
+    with open(os.path.join(ckpt_path, "node_mapping.json"), "w") as file:
+        json.dump(data_module.primekg.mapping_dict, file, indent=4)
+
     checkpoint_callback = ModelCheckpoint(
-        dirpath=train_settings.OUT_DIR, 
+        dirpath=os.path.join(train_settings.OUT_DIR, "kge"), 
         monitor="val_loss", 
         save_top_k=3, 
         mode="min"

@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import argparse
 
 from lightning.pytorch import Trainer, seed_everything
@@ -141,10 +142,17 @@ def main(
         )
     else:
         raise NotImplementedError
-        
+    
+    ckpt_path = os.path.join(train_settings.OUT_DIR, "gcl", f"{model_name}_{node_type}_{modality_transform}_{modality_merging}_{int(time.time())}")
+
+    if not os.path.exists(ckpt_path):
+        os.makedirs(ckpt_path)
+
+    with open(os.path.join(ckpt_path, "node_mapping.json"), "w") as file:
+        json.dump(data_module.primekg.mapping_dict, file, indent=4)
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=train_settings.OUT_DIR, 
+        dirpath=os.path.join(train_settings.OUT_DIR, "gcl"), 
         monitor="val_loss", 
         save_top_k=3, 
         mode="min"

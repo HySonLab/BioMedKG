@@ -63,7 +63,7 @@ class PrimeKG:
         for node_type in tqdm(self.list_nodes, desc="Load node"):
             node_type_df = self.df[self.df['x_type'] == node_type]['x_name'].unique()
 
-            lst_node_name = list(node_type_df)
+            lst_node_name = sorted(list(node_type_df))
             
             node_mapping = {node_name: index for index, node_name in enumerate(lst_node_name)}
 

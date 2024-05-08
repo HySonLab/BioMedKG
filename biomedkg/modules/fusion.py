@@ -3,26 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import math
-from typing import Optional
 
 from biomedkg.modules.utils import parameters_count
 
 class AttentionFusion(nn.Module):
     def __init__(self,
                  embed_dim : int,
-                 num_modality: int,
-                 proj_dim : Optional[int] = 0,
                  norm : bool = True,
-                 aggr : str = "mean"
                  ):
         super().__init__()
 
-        assert aggr in ["mean", "sum", "concat"], "Only mean, sum, and concat aggregation functions are supported."
-
-        self.aggr = aggr
         self.norm = norm
         self.embed_dim = embed_dim
-        self.proj_dim = proj_dim
 
         self.pos_encoder = PositionalEncoding(embed_dim)
 
@@ -30,14 +22,8 @@ class AttentionFusion(nn.Module):
         self.k_proj = nn.Linear(embed_dim, embed_dim)
         self.v_proj = nn.Linear(embed_dim, embed_dim)
 
-        if self.proj_dim != 0:
-            if self.aggr == "concat":
-                embed_dim *= num_modality
-            self.linear = nn.Linear(embed_dim, proj_dim)
-
     def forward(self, 
                 x : torch.tensor, 
-                is_same : bool = False
                 ) -> torch.tensor:
 
         batch_size = x.size(0)
@@ -46,11 +32,6 @@ class AttentionFusion(nn.Module):
         
         if self.norm:
             x = F.normalize(x, dim=-1)
-
-        if not is_same:
-            x = self.pos_encoder(x)
-        else:
-            x = None
 
         q = self.q_proj(x)
         k = self.k_proj(x)
@@ -61,18 +42,6 @@ class AttentionFusion(nn.Module):
             key=k,
             value=v,
         )
-
-        if self.aggr == "mean":
-            x = torch.mean(x, dim=1)
-        elif self.aggr == "max":
-            x = torch.max(x, dim=1)
-        elif self.aggr == "sum":
-            x = torch.sum(x, dim=1)
-        else:
-            x = x.view(batch_size, -1)
-        
-        if self.proj_dim != 0:
-            x = self.linear(F.dropout(x,p=0.2))
         
         return x
 
@@ -155,7 +124,6 @@ if __name__ == "__main__":
 
     model = AttentionFusion(
         embed_dim=embed_dim,
-        num_modality=num_modality,
         norm=True,
         aggr="mean",
     )

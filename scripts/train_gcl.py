@@ -6,7 +6,7 @@ from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
-from biomedkg.gcl_module import DGIModule, GRACEModule
+from biomedkg.gcl_module import DGIModule, GRACEModule, GGDModule
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.modules.utils import find_comet_api_key
@@ -28,7 +28,7 @@ def parse_opt():
              '--model_name', 
              type=str, 
              action='store', 
-             choices=['dgi', 'grace'], 
+             choices=['dgi', 'grace', 'ggd'], 
              default='dgi', 
              help="Select contrastive model name")
         
@@ -117,6 +117,18 @@ def main(
         )
     elif model_name == "grace":
         model = GRACEModule(
+            in_dim=gcl_settings.GCL_IN_DIMS,
+            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
+            out_dim=gcl_settings.GCL_OUT_DIM,
+            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
+            modality_fuser=modality_fuser,
+            modality_aggr=modality_merging,
+            scheduler_type=train_settings.SCHEDULER_TYPE,
+            learning_rate=train_settings.LEARNING_RATE,
+            warm_up_ratio=train_settings.WARM_UP_RATIO,
+        )
+    elif model_name == "ggd":
+        model = GGDModule(
             in_dim=gcl_settings.GCL_IN_DIMS,
             hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
             out_dim=gcl_settings.GCL_OUT_DIM,

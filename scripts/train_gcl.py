@@ -6,7 +6,7 @@ from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
-from biomedkg.gcl_module import DGIModule
+from biomedkg.gcl_module import DGIModule, GRACEModule
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.modules.utils import find_comet_api_key
@@ -23,6 +23,14 @@ def parse_opt():
              choices=['train', 'test'], 
              default='train', 
              help="Do training or testing task")
+        
+        parser.add_argument(
+             '--model_name', 
+             type=str, 
+             action='store', 
+             choices=['dgi', 'grace'], 
+             default='dgi', 
+             help="Select contrastive model name")
         
         parser.add_argument(
              '--node_type', 
@@ -61,6 +69,7 @@ def parse_opt():
 
 def main(
           task:str, 
+          model_name:str,
           node_type:str, 
           modality_transform: str,
           modality_merging: str,
@@ -93,18 +102,34 @@ def main(
             )
     else:
         modality_fuser = None
-
-    model = DGIModule(
-        in_dim=gcl_settings.GCL_IN_DIMS,
-        hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-        out_dim=gcl_settings.GCL_OUT_DIM,
-        num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-        modality_fuser=modality_fuser,
-        modality_aggr=modality_merging,
-        scheduler_type=train_settings.SCHEDULER_TYPE,
-        learning_rate=train_settings.LEARNING_RATE,
-        warm_up_ratio=train_settings.WARM_UP_RATIO,
-    )
+    
+    if model_name == "dgi":
+        model = DGIModule(
+            in_dim=gcl_settings.GCL_IN_DIMS,
+            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
+            out_dim=gcl_settings.GCL_OUT_DIM,
+            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
+            modality_fuser=modality_fuser,
+            modality_aggr=modality_merging,
+            scheduler_type=train_settings.SCHEDULER_TYPE,
+            learning_rate=train_settings.LEARNING_RATE,
+            warm_up_ratio=train_settings.WARM_UP_RATIO,
+        )
+    elif model_name == "grace":
+        model = GRACEModule(
+            in_dim=gcl_settings.GCL_IN_DIMS,
+            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
+            out_dim=gcl_settings.GCL_OUT_DIM,
+            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
+            modality_fuser=modality_fuser,
+            modality_aggr=modality_merging,
+            scheduler_type=train_settings.SCHEDULER_TYPE,
+            learning_rate=train_settings.LEARNING_RATE,
+            warm_up_ratio=train_settings.WARM_UP_RATIO,
+        )
+    else:
+        raise NotImplementedError
+        
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=train_settings.OUT_DIR, 

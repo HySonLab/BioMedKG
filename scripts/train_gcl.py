@@ -11,7 +11,7 @@ from biomedkg.gcl_module import DGIModule, GRACEModule, GGDModule
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.modules.utils import find_comet_api_key
-from biomedkg.modules import AttentionFusion
+from biomedkg.modules import AttentionFusion, ReDAF
 from biomedkg.configs import train_settings, gcl_settings, data_settings
 
 
@@ -46,7 +46,7 @@ def parse_opt():
              type=str, 
              action='store', 
              default=None,
-             choices=['attention', None], 
+             choices=['attention', 'redaf', None], 
              help="Fusion module to apply on modalities embedding")
 
         parser.add_argument(
@@ -101,6 +101,11 @@ def main(
                 embed_dim=gcl_settings.GCL_IN_DIMS,
                 norm=True,
             )
+    elif modality_transform == "redaf":
+        modality_fuser = ReDAF(
+            embed_dim=gcl_settings.GCL_IN_DIMS,
+            num_modalities = 2,
+        )     
     else:
         modality_fuser = None
     

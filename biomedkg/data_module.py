@@ -48,6 +48,7 @@ class PrimeKGModule(LightningDataModule):
             data=self.data,
             batch_size=self.batch_size,
             num_neighbors=[-1],
+            num_workers=0,
         )
        
     def all_dataloader(self):
@@ -55,6 +56,7 @@ class PrimeKGModule(LightningDataModule):
             data=self.data,
             batch_size=self.batch_size,
             num_neighbors=[30] * 3,
+            num_workers=0,
         )
 
     def train_dataloader(self):
@@ -62,6 +64,8 @@ class PrimeKGModule(LightningDataModule):
             data=self.train_data,
             batch_size=self.batch_size,
             num_neighbors=[30] * 3,
+            num_workers=0,
+            shuffle=True,
         )
 
     def val_dataloader(self):
@@ -69,6 +73,7 @@ class PrimeKGModule(LightningDataModule):
             data=self.val_data,
             batch_size=self.batch_size,
             num_neighbors=[30] * 3,
+            num_workers=0,
         )
 
     def test_dataloader(self):
@@ -76,4 +81,5 @@ class PrimeKGModule(LightningDataModule):
             data=self.test_data,
             batch_size=self.batch_size,
             num_neighbors=[30] * 3,
+            num_workers=0,
         )

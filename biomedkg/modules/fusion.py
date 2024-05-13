@@ -46,61 +46,46 @@ class AttentionFusion(nn.Module):
         return x
 
 class ReDAF(nn.Module):
-    def __init__(self,
-                embed_dim: int,
-                num_modalities: int = 2,
-                ):
-
-        super(ReDAF, self).__init__()
-        self.device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
-
-        # Parameters
+    def __init__(self, embed_dim: int, num_modalities: int = 2):
+        super().__init__()
         self.embed_dim = embed_dim
         self.num_modalities = num_modalities
-        self.modal_weights = nn.Parameter(torch.ones(num_modalities))  # Adaptive weights for each modality
-        self.sub_type_embeddings = nn.Embedding(num_modalities, embed_dim).to(self.device) 
+        self.modal_weights = nn.Parameter(torch.ones(num_modalities, 1, embed_dim))  # Updated shape [num_modalities, 1, embed_dim]
+        self.sub_type_embeddings = nn.Embedding(num_modalities, embed_dim)
 
-        # Layers
-        self.transform_layer = nn.Linear(embed_dim, embed_dim).to(self.device)   # Transform modal input
-        self.relational_context_layer = nn.Linear(embed_dim, 1).to(self.device)  # Transform relational context to a scalar temperature
+        self.transform_layer = nn.Linear(embed_dim, embed_dim)
+        self.relational_context_layer = nn.Linear(embed_dim, embed_dim)
         self.dropout = nn.Dropout(0.1)
         self.activation = nn.ReLU()
 
-    def forward(self, 
-                x: torch.tensor,
-                relational_context = 0.2,
-                sub_type_ids = None
-                ):
-
+    def forward(self, x, relational_context=0.2, sub_type_ids=None):
+        device = x.device
         batch_size = x.size(0)
 
-        x = x.view(batch_size, -1, self.embed_dim)
-        
-        relational_context = torch.tensor([relational_context], device=self.device)
-        relational_context = relational_context.expand(1, self.embed_dim)  # Expand on the correct device
+        x = x.view(batch_size, self.num_modalities, self.embed_dim)  # [batch_size, num_modalities, embed_dim]
+
+        # Prepare relational context tensor
+        relational_context = torch.full((1, self.embed_dim), relational_context, device=device)
         zeta_r = torch.sigmoid(self.relational_context_layer(relational_context))
+        zeta_r = zeta_r.unsqueeze(0).unsqueeze(0)  # [1, 1, 1, embed_dim]
+        zeta_r = zeta_r.expand(batch_size, self.num_modalities, 1, self.embed_dim)  # [batch_size, num_modalities, 1, embed_dim]
 
         if sub_type_ids is not None:
-            sub_type_ids = sub_type_ids.to(self.device)
-            sub_type_embs = self.sub_type_embeddings(sub_type_ids)  
+            sub_type_embs = self.sub_type_embeddings(sub_type_ids).to(device)
         else:
-            # Default embedding when no sub_type_ids provided
-            sub_type_embs = torch.zeros(batch_size, 2, self.embed_dim).to(self.device)
+            sub_type_embs = torch.zeros(batch_size, self.num_modalities, self.embed_dim, device=device)
 
-        weighted_inputs = []
-        for b in range(batch_size):
-            for idx, input in enumerate(x[b]):
-                # Transform the input and add subtype embedding
-                transformed_input = self.transform_layer(input + sub_type_embs[b][idx])
-                transformed_input = self.activation(transformed_input)
-                
-                # Apply adaptive weights and relational context temperature
-                weighted_input = self.modal_weights[idx] * transformed_input * zeta_r
-                weighted_inputs.append(weighted_input)
+        transformed_input = self.transform_layer(x + sub_type_embs)
+        transformed_input = self.activation(transformed_input)
 
-        # Combine all weighted inputs using mean, then reshape back to the required output
-        h_joint = torch.stack(weighted_inputs).view(batch_size, 2, -1)
-        h_joint = self.dropout(h_joint)
+        # Broadcasting modal_weights across the batch size
+        modal_weights_broadcasted = self.modal_weights.expand(self.num_modalities, batch_size, self.embed_dim).transpose(0, 1)
+        # Now modal_weights_broadcasted has shape [batch_size, num_modalities, embed_dim]
+
+        # Apply modal weights and relational context temperature, ensuring proper broadcasting
+        weighted_input = transformed_input * modal_weights_broadcasted * zeta_r.squeeze(2)  # Squeeze out the singleton dimension for zeta_r
+        
+        h_joint = self.dropout(weighted_input)
         h_joint = self.activation(h_joint)
 
         return h_joint
@@ -130,10 +115,13 @@ if __name__ == "__main__":
     embed_dim = 768
     num_modality = 2
 
-    model = AttentionFusion(
-        embed_dim=embed_dim,
-        norm=True,
-        aggr="mean",
+    # model = AttentionFusion(
+    #     embed_dim=embed_dim,
+    #     norm=True,
+    # )
+
+    model = ReDAF(
+        embed_dim= embed_dim,
     )
 
     print(model)

@@ -46,9 +46,9 @@ class PrimeKGModule(LightningDataModule):
     def subgraph_dataloader(self,):
         return NeighborLoader(
             data=self.data,
-            batch_size=self.batch_size,
             num_neighbors=[-1],
             num_workers=0,
+            shuffle=False,
         )
        
     def all_dataloader(self):

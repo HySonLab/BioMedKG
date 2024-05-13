@@ -9,6 +9,7 @@ from biomedkg import gcl_module
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.configs import data_settings, train_settings
+from lightning import seed_everything
 
 def parse_opt():
     parser = argparse.ArgumentParser()
@@ -38,7 +39,7 @@ def main(
     assert os.path.exists(ckpt)
 
     if torch.cuda.is_available():
-            device = "cuda"
+        device = "cuda"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
@@ -52,7 +53,9 @@ def main(
         model = gcl_module.GGDModule.load_from_checkpoint(ckpt)
     else:
         raise NotImplementedError
-    
+
+    seed_everything(train_settings.SEED)
+
     model = model.to(device)
     model.eval()
     
@@ -84,18 +87,14 @@ def main(
 
         node_embedding_mapping = dict()
 
-        x_all = data_module.data.x
-
         for batch in tqdm(subgraph_loader):
-            x = x_all[batch.n_id]
-            x = x.to(device)
+            x = batch.x.to(device)
 
             with torch.no_grad():
                 out = model(x, batch.edge_index.to(device))
 
             for node_id, embed in zip(batch.n_id[:batch.batch_size].tolist(), out[:batch.batch_size].detach().cpu().numpy()):
                 node_embedding_mapping[idx_to_node_dict[node_id]] = embed
-        
 
         save_dir = os.path.join(os.path.dirname(data_settings.DATA_DIR), "gcl_embed")
 

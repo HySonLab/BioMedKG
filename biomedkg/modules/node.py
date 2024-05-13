@@ -4,6 +4,45 @@ import torch
 import pickle
 from typing import List
 from pathlib import Path
+from biomedkg.configs import kge_settings
+
+class EncodeNode:
+    def __init__(
+        self,
+        embed_path : str,
+        ):
+        assert os.path.exists(embed_path), f"Can't find {embed_path}."
+
+        self.embed_path = embed_path
+
+        self.node_embed = self._get_feature_embedding_dict()
+    
+    def __call__(self, node_name_lst:List[str]) -> torch.tensor:
+        node_embedding = []
+
+        for node_name in node_name_lst:
+
+            # Get embeddings by name
+            modality_embedding = self.node_embed.get(node_name, None)
+
+            if modality_embedding is not None:
+                node_embedding.append(torch.tensor(modality_embedding))
+            else:
+                node_embedding.append(torch.rand(kge_settings.KGE_IN_DIMS))
+                    
+        node_embedding = torch.stack(node_embedding, dim=0)
+        return node_embedding
+
+    def _get_feature_embedding_dict(self,):
+        node_embed = dict()
+
+        pickle_files = glob.glob(self.embed_path + "/*.pickle")
+        for pickle_file in pickle_files:
+            with open(pickle_file, "rb") as file:
+                data = pickle.load(file=file)
+                node_embed.update(data)
+        return node_embed
+
 
 class EncodeNodeWithModality:
     def __init__(
@@ -74,6 +113,26 @@ if __name__ == "__main__":
     )
 
     node_name_lst = ['PHYHIP', 'GPANK1', 'ZRSR2','NRF1','PI4KA','SLC15A1','EIF3I','FAXDC2','MT1A','SORT1']
+
+    embeddings = encoder(node_name_lst)
+
+    print(embeddings.size())
+
+    encoder = EncodeNode(
+        embed_path="../../data/gcl_embed"
+    )
+
+    node_name_lst = ["(1,2,6,7-3H)Testosterone",
+                    "(4-{(2S)-2-[(tert-butoxycarbonyl)amino]-3-methoxy-3-oxopropyl}phenyl)methaneseleninic acid",
+                    "(6R)-Folinic acid",
+                    "(6S)-5,6,7,8-tetrahydrofolic acid",
+                    "(R)-warfarin",
+                    "(S)-2-Amino-3-(4h-Selenolo[3,2-B]-Pyrrol-6-Yl)-Propionic Acid",
+                    "(S)-2-Amino-3-(6h-Selenolo[2,3-B]-Pyrrol-4-Yl)-Propionic Acid",
+                    "(S)-Warfarin",
+                    "1,10-Phenanthroline",
+                    "1-Testosterone",
+                    ]
 
     embeddings = encoder(node_name_lst)
 

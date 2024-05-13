@@ -97,7 +97,6 @@ def main(
 
     data_module.setup()
 
-
     if modality_transform == "attention":
         modality_fuser = AttentionFusion(
                 embed_dim=gcl_settings.GCL_IN_DIMS,
@@ -107,11 +106,10 @@ def main(
         modality_fuser = ReDAF(
             embed_dim=gcl_settings.GCL_IN_DIMS,
             num_modalities = 2,
-        )
+        )     
     else:
         modality_fuser = None
-        
-
+    
     if model_name == "dgi":
         model = DGIModule(
             in_dim=gcl_settings.GCL_IN_DIMS,
@@ -218,7 +216,6 @@ def main(
             val_dataloaders=data_module.val_dataloader(),
             ckpt_path=resume 
         )
-        
     elif task == "test":
         assert resume is not None, "Please specify checkpoint path."
         trainer.test(

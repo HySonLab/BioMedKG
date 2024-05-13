@@ -10,10 +10,10 @@ class PrimeKGModule(LightningDataModule):
             self, 
             data_dir : str, 
             process_node_lst : set[str],
-            process_edge_lst : set[str],
-            batch_size : int,
-            val_ratio : float,
-            test_ratio : float,
+            process_edge_lst : set[str] = {},
+            batch_size : int = 64,
+            val_ratio : float = 0.05,
+            test_ratio : float = 0.15,
             encoder : Callable = None
             ):
         super().__init__()
@@ -46,9 +46,9 @@ class PrimeKGModule(LightningDataModule):
     def subgraph_dataloader(self,):
         return NeighborLoader(
             data=self.data,
-            batch_size=self.batch_size,
             num_neighbors=[-1],
             num_workers=0,
+            shuffle=False,
         )
        
     def all_dataloader(self):

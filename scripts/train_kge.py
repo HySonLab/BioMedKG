@@ -9,6 +9,7 @@ from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
 from biomedkg.kge_module import KGEModule
+from biomedkg.modules.node import EncodeNode
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.utils import find_comet_api_key
 from biomedkg.configs import train_settings, kge_settings, data_settings
@@ -44,6 +45,7 @@ def main(task:str, resume:str = None):
         batch_size=train_settings.BATCH_SIZE,
         val_ratio=train_settings.VAL_RATIO,
         test_ratio=train_settings.TEST_RATIO,
+        encoder=EncodeNode(embed_path="./data/gcl_embed"),
     )
 
     data_module.setup()

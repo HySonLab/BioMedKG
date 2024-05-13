@@ -54,8 +54,15 @@ To train a graph on contrastive learning with intra-node type, for example, with
 ```
 python scripts/train_gcl.py --model_name ggd --node_type gene
 ```
+
+### Get node embedding after traning GCL
+To obtain the node embedding for each modality after training with GCL, execute the following command to load the checkpoint and extract the embedding:
+```
+python scripts/get_embedding_from_ckpt.py --model_name ggd --ckpt ./ckpt/gcl/*/*.ckpt
+```
+
 ### Knowledge Graph Embedding
-Run the following command to execute Knowledge Graph Embedding task
+Run the following command to execute Link Predition on Knowledge Graph Embedding:
 ```
 python scripts/train_kge.py
 ```

@@ -45,7 +45,9 @@ def main(task:str, resume:str = None):
         batch_size=train_settings.BATCH_SIZE,
         val_ratio=train_settings.VAL_RATIO,
         test_ratio=train_settings.TEST_RATIO,
-        encoder=EncodeNode(embed_path="./data/gcl_embed"),
+        encoder=EncodeNode(
+            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "gcl_embed")
+            ),
     )
 
     data_module.setup()

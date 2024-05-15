@@ -92,7 +92,10 @@ def main(
         batch_size=train_settings.BATCH_SIZE,
         val_ratio=train_settings.VAL_RATIO,
         test_ratio=train_settings.TEST_RATIO,
-        encoder=EncodeNodeWithModality(entity_type=node_type, embed_path="./data/embed")
+        encoder=EncodeNodeWithModality(
+            entity_type=node_type, 
+            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR, "embed")),
+            )
     )
 
     data_module.setup()

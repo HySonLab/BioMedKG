@@ -6,6 +6,7 @@ from tqdm.auto import tqdm
 from torch_geometric.data import HeteroData
 
 from biomedkg.modules.utils import clean_name
+from biomedkg.configs.gcl import gcl_settings
 
 class PrimeKG:
 
@@ -72,7 +73,10 @@ class PrimeKG:
             if self.encoder is not None:
                 embedding = self.encoder(lst_node_name)
             else:
-                embedding = torch.empty(len(lst_node_name), 768)
+                # Only random init on GCL traning
+                print("\033[94m" + "Random initialize node embedding..." + "\033[0m")
+
+                embedding = torch.empty(len(lst_node_name), gcl_settings.GCL_IN_DIMS)
                 embedding = torch.nn.init.xavier_normal(embedding)
 
             node_type = clean_name(node_type)

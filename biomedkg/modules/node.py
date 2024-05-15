@@ -28,6 +28,7 @@ class EncodeNode:
             if modality_embedding is not None:
                 node_embedding.append(torch.tensor(modality_embedding))
             else:
+                print("\033[93m" + f"{node_name}" + "\033[0m" +  " not found.")
                 node_embedding.append(torch.rand(kge_settings.KGE_IN_DIMS))
                     
         node_embedding = torch.stack(node_embedding, dim=0)
@@ -80,6 +81,7 @@ class EncodeNodeWithModality:
                         embedding_max_length = len(modality_embedding)
                     fused_embedding.append(modality_embedding)
                 else:
+                    print("\033[93m" + f"{node_name}" + "\033[0m" +  " not found.")
                     fused_embedding.append([])
                     
             # Random initialization if missing modality, then convert it to a tensor

@@ -2,11 +2,12 @@ import torch
 from typing import List
 from transformers import AutoTokenizer, AutoModel, BertConfig
 from transformers import AutoTokenizer, AutoModel
+from biomedkg.modules.utils import find_device
 
 class NodeEmbedding:
     def __init__(self, model_name_or_path : str):
         
-        self.device = self.find_device()
+        self.device = find_device()
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
@@ -45,12 +46,4 @@ class NodeEmbedding:
             hidden_state = embeddings.last_hidden_state[:,0,:]
         
         return hidden_state.detach().cpu()
-
-    @staticmethod
-    def find_device() -> str:
-        if torch.cuda.is_available():
-            return "cuda"
-        elif torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
     

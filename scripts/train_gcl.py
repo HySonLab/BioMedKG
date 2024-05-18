@@ -13,7 +13,7 @@ from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.modules.utils import find_comet_api_key
 from biomedkg.modules.fusion import AttentionFusion, ReDAF
-from biomedkg.configs import train_settings, gcl_settings, data_settings
+from biomedkg.configs import train_settings, gcl_settings, data_settings, node_settings
 
 
 def parse_opt():
@@ -76,7 +76,7 @@ def main(
           modality_transform: str,
           modality_merging: str,
           resume:str = None):
-    print(f"Graph Contrastive Learning on {node_type}")
+    print("\033[95m" + f"Graph Contrastive Learning on {node_type}" + "\033[0m")
 
     seed_everything(train_settings.SEED)
 
@@ -92,22 +92,22 @@ def main(
         batch_size=train_settings.BATCH_SIZE,
         val_ratio=train_settings.VAL_RATIO,
         test_ratio=train_settings.TEST_RATIO,
-        encoder=EncodeNodeWithModality(
+        encoder=1(
             entity_type=node_type, 
-            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR, "embed")),
+            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
             )
     )
 
-    data_module.setup()
+    data_module.setup(stage="split", embed_dim=node_settings.PRETRAINED_NODE_DIM)
 
     if modality_transform == "attention":
         modality_fuser = AttentionFusion(
-                embed_dim=gcl_settings.GCL_IN_DIMS,
+                embed_dim=node_settings.PRETRAINED_NODE_DIM,
                 norm=True,
             )
     elif modality_transform == "redaf":
         modality_fuser = ReDAF(
-            embed_dim=gcl_settings.GCL_IN_DIMS,
+            embed_dim=node_settings.PRETRAINED_NODE_DIM,
             num_modalities = 2,
         )     
     else:
@@ -115,9 +115,9 @@ def main(
     
     if model_name == "dgi":
         model = DGIModule(
-            in_dim=gcl_settings.GCL_IN_DIMS,
+            in_dim=node_settings.PRETRAINED_NODE_DIM,
             hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=gcl_settings.GCL_OUT_DIM,
+            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
             num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
             modality_fuser=modality_fuser,
             modality_aggr=modality_merging,
@@ -127,9 +127,9 @@ def main(
         )
     elif model_name == "grace":
         model = GRACEModule(
-            in_dim=gcl_settings.GCL_IN_DIMS,
+            in_dim=node_settings.PRETRAINED_NODE_DIM,
             hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=gcl_settings.GCL_OUT_DIM,
+            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
             num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
             modality_fuser=modality_fuser,
             modality_aggr=modality_merging,
@@ -139,9 +139,9 @@ def main(
         )
     elif model_name == "ggd":
         model = GGDModule(
-            in_dim=gcl_settings.GCL_IN_DIMS,
+            in_dim=node_settings.PRETRAINED_NODE_DIM,
             hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=gcl_settings.GCL_OUT_DIM,
+            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
             num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
             modality_fuser=modality_fuser,
             modality_aggr=modality_merging,

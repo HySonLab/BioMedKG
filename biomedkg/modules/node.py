@@ -2,9 +2,9 @@ import os
 import glob
 import torch
 import pickle
-from typing import List
+from typing import List, Union
 from pathlib import Path
-from biomedkg.configs import kge_settings
+from biomedkg.configs import node_settings
 
 class EncodeNode:
     def __init__(
@@ -28,8 +28,7 @@ class EncodeNode:
             if modality_embedding is not None:
                 node_embedding.append(torch.tensor(modality_embedding))
             else:
-                print("\033[93m" + f"{node_name}" + "\033[0m" +  " not found.")
-                node_embedding.append(torch.rand(kge_settings.KGE_IN_DIMS))
+                node_embedding.append(torch.rand(node_settings.GCL_TRAINED_NODE_DIM))
                     
         node_embedding = torch.stack(node_embedding, dim=0)
         return node_embedding
@@ -48,67 +47,81 @@ class EncodeNode:
 class EncodeNodeWithModality:
     def __init__(
         self,
-        entity_type : str,
+        entity_type : Union[str, List[str]],
         embed_path : str,
         ):
         assert os.path.exists(embed_path), f"Can't find {embed_path}."
-        assert entity_type in ["gene", "disease", "drug"]
+
+        if isinstance(entity_type, str):
+            assert entity_type in ["gene", "disease", "drug"]
+            entity_type = [entity_type]
+        elif isinstance(entity_type, List):
+            for idx in range(len(entity_type)):
+                if entity_type[idx].startswith("gene"):
+                    entity_type[idx] = "gene"
+            
+            assert sorted(entity_type) ==  sorted(["gene", "disease", "drug"])
+
 
         self.entity_type = entity_type
         self.embed_path = embed_path
 
-        self.modality_dict = self._get_feature_embedding_dict()
+        self.node_embedding_map = self._get_feature_embedding_dict()
     
     def __call__(self, node_name_lst:List[str]) -> torch.tensor:
         node_embedding = []
 
-        embedding_max_length = 0
-
         for node_name in node_name_lst:
-            fused_embedding = []
-
-            # Ensure that "sequence" is always in the second position
-            modality_sorted_lst = sorted(self.modality_dict.keys(), key=lambda s: (1, s) if "seq" in s else (0, s))
-
-            # Get embeddings by name
-            for modality in modality_sorted_lst:
-
-                modality_embedding = self.modality_dict[modality].get(node_name, None)
-
-                if modality_embedding is not None:
-                    # Find the embedding size if there are missing modalities
-                    if len(modality_embedding) > embedding_max_length:
-                        embedding_max_length = len(modality_embedding)
-                    fused_embedding.append(modality_embedding)
-                else:
-                    print("\033[93m" + f"{node_name}" + "\033[0m" +  " not found.")
-                    fused_embedding.append([])
-                    
-            # Random initialization if missing modality, then convert it to a tensor
-            for idx in range(len(fused_embedding)):
-                if len(fused_embedding[idx]) == 0:
-                    fused_embedding[idx] = torch.rand(embedding_max_length)
-                else:
-                    fused_embedding[idx] = torch.tensor(fused_embedding[idx])
-            
-            node_embedding.append(torch.cat(fused_embedding, dim=0))
+            embedding = self.node_embedding_map.get(node_name, None)
+            if embedding is None:
+                embedding = torch.rand(node_settings.PRETRAINED_NODE_DIM * 2)
+            node_embedding.append(embedding)
 
         node_embedding = torch.stack(node_embedding, dim=0)
         return node_embedding
 
-    def _get_feature_embedding_dict(self,):
-        modality_dict = dict()
+    def _get_feature_embedding_dict(self,) -> dict:
+        node_embedding_map = dict()
 
-        pickle_files = glob.glob(self.embed_path + f"/{self.entity_type}*.pickle")
-        for pickle_file in pickle_files:
-            modality_name = Path(pickle_file).stem.split("_")[1]
-            with open(pickle_file, "rb") as file:
-                data = pickle.load(file=file)
-                modality_dict[modality_name] = data
-        return modality_dict
+        for entity_type in self.entity_type:
+            
+            modality_dict = dict()
+            all_modality = list()
+
+            # Load LLM embeddings by modality and store them in dictionary
+            pickle_files = glob.glob(self.embed_path + f"/{entity_type}*.pickle")
+            for pickle_file in pickle_files:
+                modality_name = Path(pickle_file).stem.split("_")[1]
+                with open(pickle_file, "rb") as file:
+                    data = pickle.load(file=file)
+                    modality_dict[modality_name] = data
+                all_modality.append(modality_name)
+            
+            # Ensure 'seq' is always at the second position
+            all_modality = sorted(all_modality, key=lambda s: (1, s) if "seq" in s else (0, s))
+            
+            # Get all node_name
+            all_node_name = set()
+            for modality_name in all_modality:
+                all_node_name.update(modality_dict[modality_name].keys())
+            
+            # Get embedding by node name
+            for node_name in all_node_name:
+                fuse_embed = list()
+                for modality_name in all_modality:
+                    embedding = modality_dict[modality_name].get(node_name, None)
+
+                    if embedding is not None:
+                        fuse_embed.append(torch.tensor(embedding))
+                    else:
+                        fuse_embed.append(torch.rand(node_settings.PRETRAINED_NODE_DIM))
+
+                node_embedding_map[node_name] = torch.cat(fuse_embed, dim=0)
+
+        return node_embedding_map
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     encoder = EncodeNodeWithModality(
         entity_type="gene",
         embed_path="../../data/embed"

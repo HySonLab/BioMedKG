@@ -1,5 +1,6 @@
 import os
 import re
+import torch
 from typing import Any
 
 def clean_name(input_string) -> str:
@@ -37,3 +38,10 @@ def generator(data:list[str], batch_size:int):
             yield data[i:i + batch_size]
         else:
             yield data[i:]
+
+def find_device() -> str:
+        if torch.cuda.is_available():
+            return "cuda"
+        elif torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"

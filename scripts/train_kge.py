@@ -9,11 +9,10 @@ from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
 from biomedkg.kge_module import KGEModule
-from biomedkg.modules.node import EncodeNode
+from biomedkg.modules.node import EncodeNode, EncodeNodeWithModality
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.utils import find_comet_api_key
-from biomedkg.configs import train_settings, kge_settings, data_settings
-
+from biomedkg.configs import train_settings, kge_settings, data_settings, node_settings
 
 def parse_opt():
         parser = argparse.ArgumentParser()
@@ -38,6 +37,27 @@ def parse_opt():
 def main(task:str, resume:str = None):
     seed_everything(train_settings.SEED)
 
+    node_init_method = kge_settings.KGE_NODE_INIT_METHOD
+
+    if node_init_method == "gcl":
+        encoder = EncodeNode(
+            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "gcl_embed")
+            )
+    elif node_init_method == "llm":
+        encoder = EncodeNodeWithModality(
+            entity_type=list(data_settings.NODES_LST), 
+            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
+            )
+    elif node_init_method == "random":
+        encoder = None
+    else:
+        raise NotImplementedError
+    
+    if node_init_method == "random":
+        embed_dim = node_settings.GCL_TRAINED_NODE_DIM
+    else:
+        embed_dim = None
+
     data_module = PrimeKGModule(
         data_dir=data_settings.DATA_DIR,
         process_node_lst=data_settings.NODES_LST,
@@ -45,19 +65,17 @@ def main(task:str, resume:str = None):
         batch_size=train_settings.BATCH_SIZE,
         val_ratio=train_settings.VAL_RATIO,
         test_ratio=train_settings.TEST_RATIO,
-        encoder=EncodeNode(
-            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "gcl_embed")
-            ),
+        encoder=encoder,
     )
 
-    data_module.setup()
+    data_module.setup(stage="split", embed_dim=embed_dim)
 
     model = KGEModule(
-        encoder_name=kge_settings.KGE_ENCODER_MODEL_NAME,
-        decoder_name=kge_settings.KGE_DECODER_MODEL_NAME,
-        in_dim=kge_settings.KGE_IN_DIMS,
+        encoder_name=kge_settings.KGE_ENCODER,
+        decoder_name=kge_settings.KGE_DECODER,
+        in_dim=node_settings.GCL_TRAINED_NODE_DIM,
         hidden_dim=kge_settings.KGE_HIDDEN_DIM,
-        out_dim=kge_settings.KGE_OUT_DIM,
+        out_dim=node_settings.KGE_TRAINED_NODE_DIM,
         num_hidden_layers=kge_settings.KGE_NUM_HIDDEN,
         num_relation=data_module.data.num_edge_types,
         num_heads=kge_settings.KGE_NUM_HEAD,
@@ -66,8 +84,8 @@ def main(task:str, resume:str = None):
         warm_up_ratio=train_settings.WARM_UP_RATIO,
     )
     exp_name = str(int(time.time()))
-    ckpt_path = os.path.join(train_settings.OUT_DIR, "kge", f"{kge_settings.KGE_ENCODER_MODEL_NAME}_{kge_settings.KGE_DECODER_MODEL_NAME}_{exp_name}")
-    log_dir = os.path.join(train_settings.LOG_DIR, "kge", f"{kge_settings.KGE_ENCODER_MODEL_NAME}_{kge_settings.KGE_DECODER_MODEL_NAME}_{exp_name}")
+    ckpt_path = os.path.join(train_settings.OUT_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
+    log_dir = os.path.join(train_settings.LOG_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
 
     if not os.path.exists(ckpt_path):
         os.makedirs(ckpt_path)

@@ -8,6 +8,8 @@ class NodeSettings(BaseSettings):
     PRETRAINED_NODE_DIM: int
     GCL_TRAINED_NODE_DIM: int
     KGE_TRAINED_NODE_DIM: int
+    MODALITY_TRANSFORM_METHOD : str
+    MODALITY_MERGING_METHOD : str
 
     @classmethod
     def settings_customise_sources(

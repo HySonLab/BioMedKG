@@ -12,7 +12,6 @@ from biomedkg.gcl_module import DGIModule, GRACEModule, GGDModule
 from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.node import EncodeNodeWithModality
 from biomedkg.modules.utils import find_comet_api_key
-from biomedkg.modules.fusion import AttentionFusion, ReDAF
 from biomedkg.configs import train_settings, gcl_settings, data_settings, node_settings
 
 
@@ -40,24 +39,7 @@ def parse_opt():
              action='store', 
              required=True,
              choices=['gene', 'drug', 'disease'], 
-             help="Train contrastive learning on which node type")
-        
-        parser.add_argument(
-             '--modality_transform', 
-             type=str, 
-             action='store', 
-             default=None,
-             choices=['attention', 'redaf', None], 
-             help="Fusion module to apply on modalities embedding")
-
-        parser.add_argument(
-             '--modality_merging', 
-             type=str, 
-             action='store', 
-             default='mean',
-             choices=['mean', 'sum', 'concat'], 
-             help="Modalities merging function")
-        
+             help="Train contrastive learning on which node type")        
         
         parser.add_argument(
              '--ckpt_path', 
@@ -73,8 +55,6 @@ def main(
           task:str, 
           model_name:str,
           node_type:str, 
-          modality_transform: str,
-          modality_merging: str,
           ckpt_path:str = None):
     print("\033[95m" + f"Graph Contrastive Learning on {node_type}" + "\033[0m")
 
@@ -101,20 +81,6 @@ def main(
 
     data_module.setup(stage="split", embed_dim=node_settings.PRETRAINED_NODE_DIM)
 
-    # Set up Modality fuser
-    if modality_transform == "attention":
-        modality_fuser = AttentionFusion(
-                embed_dim=node_settings.PRETRAINED_NODE_DIM,
-                norm=True,
-            )
-    elif modality_transform == "redaf":
-        modality_fuser = ReDAF(
-            embed_dim=node_settings.PRETRAINED_NODE_DIM,
-            num_modalities = 2,
-        )     
-    else:
-        modality_fuser = None
-    
     # Initialize GCL module
     if model_name == "dgi":
         model = DGIModule(
@@ -122,8 +88,6 @@ def main(
             hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
             out_dim=node_settings.GCL_TRAINED_NODE_DIM,
             num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            modality_fuser=modality_fuser,
-            modality_aggr=modality_merging,
             scheduler_type=train_settings.SCHEDULER_TYPE,
             learning_rate=train_settings.LEARNING_RATE,
             warm_up_ratio=train_settings.WARM_UP_RATIO,
@@ -134,8 +98,6 @@ def main(
             hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
             out_dim=node_settings.GCL_TRAINED_NODE_DIM,
             num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            modality_fuser=modality_fuser,
-            modality_aggr=modality_merging,
             scheduler_type=train_settings.SCHEDULER_TYPE,
             learning_rate=train_settings.LEARNING_RATE,
             warm_up_ratio=train_settings.WARM_UP_RATIO,
@@ -146,8 +108,6 @@ def main(
             hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
             out_dim=node_settings.GCL_TRAINED_NODE_DIM,
             num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            modality_fuser=modality_fuser,
-            modality_aggr=modality_merging,
             scheduler_type=train_settings.SCHEDULER_TYPE,
             learning_rate=train_settings.LEARNING_RATE,
             warm_up_ratio=train_settings.WARM_UP_RATIO,
@@ -158,8 +118,8 @@ def main(
     # Setup logging/ckpt path
     if ckpt_path is None:
         exp_name = str(int(time.time()))
-        ckpt_dir = os.path.join(train_settings.OUT_DIR, "gcl", node_type, f"{model_name}_{node_type}_{modality_transform}_{modality_merging}_{exp_name}")
-        log_dir = os.path.join(train_settings.LOG_DIR, "gcl", node_type, f"{model_name}_{node_type}_{modality_transform}_{modality_merging}_{exp_name}")
+        ckpt_dir = os.path.join(train_settings.OUT_DIR, "gcl", node_type, f"{model_name}_{node_type}_{node_settings.MODALITY_TRANSFORM_METHOD}_{node_settings.MODALITY_MERGING_METHOD}_{exp_name}")
+        log_dir = os.path.join(train_settings.LOG_DIR, "gcl", node_type, f"{model_name}_{node_type}_{node_settings.MODALITY_TRANSFORM_METHOD}_{node_settings.MODALITY_MERGING_METHOD}_{exp_name}")
 
         if not os.path.exists(ckpt_dir):
             os.makedirs(ckpt_dir)

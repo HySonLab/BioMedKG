@@ -1,5 +1,3 @@
-from typing import Any
-
 import torch
 import torch.nn.functional as F
 from lightning import LightningModule
@@ -10,6 +8,8 @@ from torch_geometric.utils import negative_sampling
 from transformers.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
 from biomedkg.modules import RGCN, RGAT, DistMult, TransE
+from biomedkg.modules.fusion import AttentionFusion, ReDAF
+from biomedkg.configs import kge_settings, node_settings
 
 class KGEModule(LightningModule):
     def __init__(self,
@@ -20,7 +20,7 @@ class KGEModule(LightningModule):
                  out_dim : int,
                  num_hidden_layers : int,
                  num_relation : int,
-                 num_heads : int = 2,
+                 num_heads : int,
                  scheduler_type : str = "cosine",
                  learning_rate: float = 2e-4,
                  warm_up_ratio: float = 0.03,
@@ -31,6 +31,29 @@ class KGEModule(LightningModule):
         assert scheduler_type in ["linear", "cosine"], "Only support 'cosine' and 'linear'"
 
         self.save_hyperparameters()
+
+        self.feature_embedding_dim = in_dim
+
+        self.llm_init_node = False
+        
+        if kge_settings.KGE_NODE_INIT_METHOD == "llm":
+            self.llm_init_node = True
+
+            if node_settings.MODALITY_TRANSFORM_METHOD == "attention":
+                self.modality_fuser = AttentionFusion(
+                        embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                        norm=True,
+                    )
+            elif node_settings.MODALITY_TRANSFORM_METHOD == "redaf":
+                self.modality_fuser = ReDAF(
+                    embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                    num_modalities = 2,
+                )     
+            else:
+                self.modality_fuser = None
+
+            self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
+        
 
         if encoder_name == "rgcn":
             self.encoder = RGCN(
@@ -85,10 +108,42 @@ class KGEModule(LightningModule):
         self.test_metrics = metrics.clone(prefix="test_")
     
     def forward(self, x, edge_index, edge_type):
+        if self.llm_init_node:
+            if self.modality_fuser is None:
+                x = x.view(x.size(0), -1, self.feature_embedding_dim)
+                x = F.normalize(x, dim=-1)
+            else:
+                x = self.modality_fuser(x)
+
+            if self.modality_aggr == "mean":
+                x = torch.mean(x, dim=1)
+            elif self.modality_aggr == "sum":
+                x = torch.sum(x, dim=1)
+            else:
+                x = x.view(x.size(0), -1) 
+
         return self.encoder(x, edge_index, edge_type)
     
     def training_step(self, batch):
-        z = self.model.encode(batch.x, batch.edge_index, batch.edge_type)
+        if self.llm_init_node:
+            # Reshape if does not apply transformation
+            if self.modality_fuser is None:
+                x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+                x = F.normalize(x, dim=-1)
+            else:
+                x = self.modality_fuser(batch.x)
+
+            # Modalities fusion
+            if self.modality_aggr == "mean":
+                x = torch.mean(x, dim=1)
+            elif self.modality_aggr == "sum":
+                x = torch.sum(x, dim=1)
+            else:
+                x = x.view(x.size(0), -1)
+        else:
+            x = batch.x
+
+        z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index = negative_sampling(batch.edge_index)
 
@@ -106,7 +161,25 @@ class KGEModule(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        z = self.model.encode(batch.x, batch.edge_index, batch.edge_type)
+        if self.llm_init_node:
+            # Reshape if does not apply transformation
+            if self.modality_fuser is None:
+                x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+                x = F.normalize(x, dim=-1)
+            else:
+                x = self.modality_fuser(batch.x)
+
+            # Modalities fusion
+            if self.modality_aggr == "mean":
+                x = torch.mean(x, dim=1)
+            elif self.modality_aggr == "sum":
+                x = torch.sum(x, dim=1)
+            else:
+                x = x.view(x.size(0), -1)
+        else:
+            x = batch.x
+
+        z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index = negative_sampling(batch.edge_index)
 
@@ -131,7 +204,25 @@ class KGEModule(LightningModule):
         self.valid_metrics.reset()
     
     def test_step(self, batch, batch_idx):
-        z = self.model.encode(batch.x, batch.edge_index, batch.edge_type)
+        if self.llm_init_node:
+            # Reshape if does not apply transformation
+            if self.modality_fuser is None:
+                x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+                x = F.normalize(x, dim=-1)
+            else:
+                x = self.modality_fuser(batch.x)
+
+            # Modalities fusion
+            if self.modality_aggr == "mean":
+                x = torch.mean(x, dim=1)
+            elif self.modality_aggr == "sum":
+                x = torch.sum(x, dim=1)
+            else:
+                x = x.view(x.size(0), -1)
+        else:
+            x = batch.x
+
+        z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index = negative_sampling(batch.edge_index)
 

@@ -54,8 +54,10 @@ def main(task:str, ckpt_path:str = None):
     else:
         raise NotImplementedError
     
-    if node_init_method == "random":
+    if node_init_method == "gcl" or node_init_method == "random":
         embed_dim = node_settings.GCL_TRAINED_NODE_DIM
+    elif node_init_method == "llm":
+        embed_dim = node_settings.PRETRAINED_NODE_DIM
     else:
         embed_dim = None
 
@@ -76,7 +78,7 @@ def main(task:str, ckpt_path:str = None):
     model = KGEModule(
         encoder_name=kge_settings.KGE_ENCODER,
         decoder_name=kge_settings.KGE_DECODER,
-        in_dim=node_settings.GCL_TRAINED_NODE_DIM,
+        in_dim=embed_dim,
         hidden_dim=kge_settings.KGE_HIDDEN_DIM,
         out_dim=node_settings.KGE_TRAINED_NODE_DIM,
         num_hidden_layers=kge_settings.KGE_NUM_HIDDEN,

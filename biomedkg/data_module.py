@@ -1,6 +1,6 @@
 from lightning import LightningDataModule
 import torch_geometric.transforms as T
-from torch_geometric.loader import NeighborLoader
+from torch_geometric.loader import NeighborLoader, GraphSAINTRandomWalkSampler
 from typing import Callable
 
 from biomedkg.modules.data import PrimeKG
@@ -60,27 +60,63 @@ class PrimeKGModule(LightningDataModule):
             num_workers=0,
         )
 
-    def train_dataloader(self):
-        return NeighborLoader(
-            data=self.train_data,
-            batch_size=self.batch_size,
-            num_neighbors=[30] * 3,
-            num_workers=0,
-            shuffle=True,
-        )
+    def train_dataloader(self, loader_type: str = "neighbor"):
+        
+        assert loader_type in ["neighbor", "graph_saint"]
 
-    def val_dataloader(self):
-        return NeighborLoader(
-            data=self.val_data,
-            batch_size=self.batch_size,
-            num_neighbors=[30] * 3,
-            num_workers=0,
-        )
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.train_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+                shuffle=True,
+            )
+        elif loader_type == "graph_saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.train_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=1000,
+                num_workers=0,
+            )
 
-    def test_dataloader(self):
-        return NeighborLoader(
-            data=self.test_data,
-            batch_size=self.batch_size,
-            num_neighbors=[30] * 3,
-            num_workers=0,
-        )
+    def val_dataloader(self, loader_type: str):
+
+        assert loader_type in ["neighbor", "graph_saint"]
+
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.val_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+            )
+        elif loader_type == "graph_saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.val_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=200,
+                num_workers=0,
+            )
+
+    def test_dataloader(self, loader_type: str):
+
+        assert loader_type in ["neighbor", "graph_saint"]
+
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.test_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+            )
+        elif loader_type == "graph_saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.test_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=200,
+                num_workers=0,
+            )

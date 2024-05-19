@@ -193,8 +193,8 @@ def main(
 
         trainer.fit(
             model=model,
-            train_dataloaders=data_module.train_dataloader(),
-            val_dataloaders=data_module.val_dataloader(),
+            train_dataloaders=data_module.train_dataloader(loader_type="neighbor"),
+            val_dataloaders=data_module.val_dataloader(loader_type="neighbor"),
             ckpt_path=ckpt_path 
         )
 
@@ -203,7 +203,7 @@ def main(
         assert ckpt_path is not None, "Please specify checkpoint path."
         trainer.test(
              model=model,
-             dataloaders=data_module.test_dataloader(),
+             dataloaders=data_module.test_dataloader(loader_type="neighbor"),
              ckpt_path=ckpt_path,
         )
     

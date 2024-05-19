@@ -166,8 +166,8 @@ def main(task:str, ckpt_path:str = None):
 
         trainer.fit(
             model=model,
-            train_dataloaders=data_module.train_dataloader(),
-            val_dataloaders=data_module.val_dataloader(),
+            train_dataloaders=data_module.train_dataloader(loader_type="graph_saint"),
+            val_dataloaders=data_module.val_dataloader(loader_type="graph_saint"),
             ckpt_path=ckpt_path 
         )
 
@@ -176,7 +176,7 @@ def main(task:str, ckpt_path:str = None):
         assert ckpt_path is not None, "Please specify checkpoint path."
         trainer.test(
              model=model,
-             dataloaders=data_module.test_dataloader(),
+             dataloaders=data_module.test_dataloader(loader_type="graph_saint"),
              ckpt_path=ckpt_path,
         )
     

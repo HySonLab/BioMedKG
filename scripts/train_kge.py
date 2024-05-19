@@ -25,18 +25,19 @@ def parse_opt():
              help="Do training or testing task")
         
         parser.add_argument(
-             '--resume', 
+             '--ckpt_path', 
              type=str, 
              default=None,
              required=False,
-             help="Resume training from ckpt")
+             help="Path to checkpoint")
         opt = parser.parse_args()
         return opt
 
 
-def main(task:str, resume:str = None):
+def main(task:str, ckpt_path:str = None):
     seed_everything(train_settings.SEED)
 
+    # Decide node intialize method
     node_init_method = kge_settings.KGE_NODE_INIT_METHOD
 
     if node_init_method == "gcl":
@@ -58,6 +59,7 @@ def main(task:str, resume:str = None):
     else:
         embed_dim = None
 
+    # Setup data module
     data_module = PrimeKGModule(
         data_dir=data_settings.DATA_DIR,
         process_node_lst=data_settings.NODES_LST,
@@ -70,6 +72,7 @@ def main(task:str, resume:str = None):
 
     data_module.setup(stage="split", embed_dim=embed_dim)
 
+    # Initialize KGE Module
     model = KGEModule(
         encoder_name=kge_settings.KGE_ENCODER,
         decoder_name=kge_settings.KGE_DECODER,
@@ -83,21 +86,28 @@ def main(task:str, resume:str = None):
         learning_rate=train_settings.LEARNING_RATE,
         warm_up_ratio=train_settings.WARM_UP_RATIO,
     )
-    exp_name = str(int(time.time()))
-    ckpt_path = os.path.join(train_settings.OUT_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
-    log_dir = os.path.join(train_settings.LOG_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
 
-    if not os.path.exists(ckpt_path):
-        os.makedirs(ckpt_path)
-    
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    # Setup logging/ckpt path
+    if ckpt_path is None:
+        exp_name = str(int(time.time()))
+        ckpt_dir = os.path.join(train_settings.OUT_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
+        log_dir = os.path.join(train_settings.LOG_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
 
-    with open(os.path.join(ckpt_path, "node_mapping.json"), "w") as file:
-        json.dump(data_module.primekg.mapping_dict, file, indent=4)
+        if not os.path.exists(ckpt_dir):
+            os.makedirs(ckpt_dir)
+        
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        with open(os.path.join(ckpt_dir, "node_mapping.json"), "w") as file:
+            json.dump(data_module.primekg.mapping_dict, file, indent=4)
+    else:
+        ckpt_dir = os.path.dirname(ckpt_path)
+        log_dir = ckpt_dir.replace(os.path.basename(train_settings.OUT_DIR), os.path.basename(train_settings.LOG_DIR))
+        exp_name = str(os.path.basename(ckpt_dir).split("_")[-1])
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=ckpt_path, 
+        dirpath=ckpt_dir, 
         monitor="val_loss", 
         save_top_k=3, 
         mode="min",
@@ -113,19 +123,16 @@ def main(task:str, resume:str = None):
         experiment_name=exp_name,
     )
 
+    # Prepare trainer args
     trainer_args = {
         "accelerator": "auto", 
         "log_every_n_steps": 10,
-        "max_epochs": train_settings.EPOCHS,
-        "check_val_every_n_epoch": train_settings.VAL_EVERY_N_EPOCH,
-        "default_root_dir": ckpt_path,
-        "enable_checkpointing": True, 
+        "default_root_dir": ckpt_dir,
         "logger": logger, 
-        "callbacks": [checkpoint_callback, early_stopping], 
         "deterministic": True, 
-        "gradient_clip_val": 1.0,
     }
 
+    # Setup multiple GPUs training
     if isinstance(train_settings.DEVICES, list) and len(train_settings.DEVICES) > 1:
         trainer_args.update(
             {
@@ -141,22 +148,38 @@ def main(task:str, resume:str = None):
                 }
             )
 
-    trainer = Trainer(**trainer_args)
-    
+    # Train
     if task == "train":
+        trainer_args.update(
+            {
+                "max_epochs": train_settings.EPOCHS,
+                "check_val_every_n_epoch": train_settings.VAL_EVERY_N_EPOCH,
+                "enable_checkpointing": True,     
+                "gradient_clip_val": 1.0,
+                "callbacks": [checkpoint_callback, early_stopping],
+            }
+        )
+
+        trainer = Trainer(**trainer_args)
+
         trainer.fit(
             model=model,
             train_dataloaders=data_module.train_dataloader(),
             val_dataloaders=data_module.val_dataloader(),
-            ckpt_path=resume, 
+            ckpt_path=ckpt_path 
         )
+
+    # Test
     elif task == "test":
-        assert resume is not None, "Please specify checkpoint path."
+        assert ckpt_path is not None, "Please specify checkpoint path."
         trainer.test(
              model=model,
-             dataloaders=data_module.test_dataloader,
-             ckpt_path=resume,
+             dataloaders=data_module.test_dataloader(),
+             ckpt_path=ckpt_path,
         )
+    
+    else:
+        raise NotImplementedError
 
 
 if __name__ == "__main__":

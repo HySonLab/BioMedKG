@@ -6,7 +6,6 @@ from tqdm.auto import tqdm
 from torch_geometric.data import HeteroData
 
 from biomedkg.modules.utils import clean_name
-from biomedkg.configs.gcl import gcl_settings
 
 class PrimeKG:
 
@@ -15,7 +14,9 @@ class PrimeKG:
             data_dir : str,
             process_node_lst : set[str],
             process_edge_lst : set[str],
-            encoder : dict = None):
+            embed_dim : int,
+            encoder : dict = None,
+            ):
         
         try:
             from tdc.resource import PrimeKG
@@ -51,6 +52,7 @@ class PrimeKG:
             print(f"\t- {edge_type}")
 
         self.encoder = encoder
+        self.embedding_dim = embed_dim
 
     def get_data(self,):
         self._build_node_embedding()
@@ -62,9 +64,10 @@ class PrimeKG:
         self.mapping_dict = dict()
 
         for node_type in tqdm(self.list_nodes, desc="Load node"):
-            node_type_df = self.df[self.df['x_type'] == node_type]['x_name'].unique()
+            node_df = self.df[self.df['x_type'] == node_type]
+            lst_node_name = set(node_df['x_name'].values)
 
-            lst_node_name = sorted(list(node_type_df))
+            lst_node_name = sorted(lst_node_name)
             
             node_mapping = {node_name: index for index, node_name in enumerate(lst_node_name)}
 
@@ -73,10 +76,9 @@ class PrimeKG:
             if self.encoder is not None:
                 embedding = self.encoder(lst_node_name)
             else:
-                # Only random init on GCL traning
-                print("\033[94m" + "Random initialize node embedding..." + "\033[0m")
+                assert self.embedding_dim is not None
 
-                embedding = torch.empty(len(lst_node_name), gcl_settings.GCL_IN_DIMS)
+                embedding = torch.empty(len(lst_node_name), self.embedding_dim)
                 embedding = torch.nn.init.xavier_normal(embedding)
 
             node_type = clean_name(node_type)

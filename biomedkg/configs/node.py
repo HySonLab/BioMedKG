@@ -2,12 +2,14 @@ from typing import Tuple, Type
 from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
 
 
-class GCLSettings(BaseSettings):
+class NodeSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
-    GCL_HIDDEN_DIM : int
-    GCL_NUM_HIDDEN : int
-    GCL_DROP_OUT : bool
+    PRETRAINED_NODE_DIM: int
+    GCL_TRAINED_NODE_DIM: int
+    KGE_TRAINED_NODE_DIM: int
+    MODALITY_TRANSFORM_METHOD : str
+    MODALITY_MERGING_METHOD : str
 
     @classmethod
     def settings_customise_sources(
@@ -20,4 +22,4 @@ class GCLSettings(BaseSettings):
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
         return dotenv_settings, env_settings, init_settings
 
-gcl_settings = GCLSettings()
+node_settings = NodeSettings()

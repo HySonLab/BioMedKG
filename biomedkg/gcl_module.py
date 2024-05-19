@@ -8,6 +8,8 @@ from transformers.optimization import get_cosine_schedule_with_warmup, get_linea
 
 from biomedkg.modules.gcl import DGI, GRACE, GGD
 from biomedkg.modules import GCNEncoder
+from biomedkg.configs import node_settings
+from biomedkg.modules.fusion import AttentionFusion, ReDAF
 
 from lightning import LightningModule
 
@@ -17,21 +19,32 @@ class DGIModule(LightningModule):
                  hidden_dim : int,
                  out_dim : int,
                  num_hidden_layers : int,
-                 modality_fuser: Callable = None,
-                 modality_aggr: str = "mean",
                  scheduler_type : str = "cosine",
                  learning_rate: float = 2e-4,
                  warm_up_ratio: float = 0.03,
                  ):
         super().__init__()
         assert scheduler_type in ["linear", "cosine"], "Only support 'cosine' and 'linear'"
-        assert modality_aggr in ["mean", "sum", "concat"], "Only mean, sum, and concat aggregation functions are supported."
 
         self.save_hyperparameters()
 
         self.feature_embedding_dim = in_dim
-        self.modality_fuser = modality_fuser
-        self.modality_aggr = modality_aggr
+
+        # Set up Modality fuser
+        if node_settings.MODALITY_TRANSFORM_METHOD == "attention":
+            self.modality_fuser = AttentionFusion(
+                    embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                    norm=True,
+                )
+        elif node_settings.MODALITY_TRANSFORM_METHOD == "redaf":
+            self.modality_fuser = ReDAF(
+                embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                num_modalities = 2,
+            )     
+        else:
+            self.modality_fuser = None
+
+        self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
 
         self.model = DGI(
             encoder=GCNEncoder(
@@ -54,9 +67,9 @@ class DGIModule(LightningModule):
         # Reshape if does not apply fusion transformation
         if self.modality_fuser is None:
             x = x.view(x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(x)
-            x = F.normalize(x, dim=-1)
 
         if self.modality_aggr == "mean":
             x = torch.mean(x, dim=1)
@@ -74,9 +87,9 @@ class DGIModule(LightningModule):
         # Reshape if does not apply transformation
         if self.modality_fuser is None:
             x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(batch.x)
-            x = F.normalize(x, dim=-1)
 
         # Modalities fusion
         if self.modality_aggr == "mean":
@@ -98,9 +111,9 @@ class DGIModule(LightningModule):
         # Reshape if does not apply transformation
         if self.modality_fuser is None:
             x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(batch.x)
-            x = F.normalize(x, dim=-1)
 
         # Modalities fusion
         if self.modality_aggr == "mean":
@@ -122,9 +135,9 @@ class DGIModule(LightningModule):
         # Reshape if does not apply transformation
         if self.modality_fuser is None:
             x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(batch.x)
-            x = F.normalize(x, dim=-1)
 
         # Modalities fusion
         if self.modality_aggr == "mean":
@@ -168,21 +181,32 @@ class GRACEModule(LightningModule):
                  hidden_dim : int,
                  out_dim : int,
                  num_hidden_layers : int,
-                 modality_fuser: Callable = None,
-                 modality_aggr: str = "mean",
                  scheduler_type : str = "cosine",
                  learning_rate: float = 2e-4,
                  warm_up_ratio: float = 0.03,
                  ):
         super().__init__()
         assert scheduler_type in ["linear", "cosine"], "Only support 'cosine' and 'linear'"
-        assert modality_aggr in ["mean", "sum", "concat"], "Only mean, sum, and concat aggregation functions are supported."
 
         self.save_hyperparameters()
 
         self.feature_embedding_dim = in_dim
-        self.modality_fuser = modality_fuser
-        self.modality_aggr = modality_aggr
+        
+        # Set up Modality fuser
+        if node_settings.MODALITY_TRANSFORM_METHOD == "attention":
+            self.modality_fuser = AttentionFusion(
+                    embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                    norm=True,
+                )
+        elif node_settings.MODALITY_TRANSFORM_METHOD == "redaf":
+            self.modality_fuser = ReDAF(
+                embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                num_modalities = 2,
+            )     
+        else:
+            self.modality_fuser = None
+
+        self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
 
         self.model = GRACE(
             encoder=GCNEncoder(
@@ -206,9 +230,9 @@ class GRACEModule(LightningModule):
         # Reshape if does not apply fusion transformation
         if self.modality_fuser is None:
             x = x.view(x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(x)
-            x = F.normalize(x, dim=-1)
 
         if self.modality_aggr == "mean":
             x = torch.mean(x, dim=1)
@@ -226,9 +250,9 @@ class GRACEModule(LightningModule):
         # Reshape if does not apply transformation
         if self.modality_fuser is None:
             x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(batch.x)
-            x = F.normalize(x, dim=-1)
 
         # Modalities fusion
         if self.modality_aggr == "mean":
@@ -251,9 +275,9 @@ class GRACEModule(LightningModule):
         # Reshape if does not apply transformation
         if self.modality_fuser is None:
             x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(batch.x)
-            x = F.normalize(x, dim=-1)
 
         # Modalities fusion
         if self.modality_aggr == "mean":
@@ -276,9 +300,9 @@ class GRACEModule(LightningModule):
         # Reshape if does not apply transformation
         if self.modality_fuser is None:
             x = batch.x.view(batch.x.size(0), -1, self.feature_embedding_dim)
+            x = F.normalize(x, dim=-1)
         else:
             x = self.modality_fuser(batch.x)
-            x = F.normalize(x, dim=-1)
 
         # Modalities fusion
         if self.modality_aggr == "mean":
@@ -323,21 +347,32 @@ class GGDModule(LightningModule):
                  hidden_dim : int,
                  out_dim : int,
                  num_hidden_layers : int,
-                 modality_fuser: Callable = None,
-                 modality_aggr: str = "mean",
                  scheduler_type : str = "cosine",
                  learning_rate: float = 2e-4,
                  warm_up_ratio: float = 0.03,
                  ):
         super().__init__()
         assert scheduler_type in ["linear", "cosine"], "Only support 'cosine' and 'linear'"
-        assert modality_aggr in ["mean", "sum", "concat"], "Only mean, sum, and concat aggregation functions are supported."
 
         self.save_hyperparameters()
 
         self.feature_embedding_dim = in_dim
-        self.modality_fuser = modality_fuser
-        self.modality_aggr = modality_aggr
+
+        # Set up Modality fuser
+        if node_settings.MODALITY_TRANSFORM_METHOD == "attention":
+            self.modality_fuser = AttentionFusion(
+                    embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                    norm=True,
+                )
+        elif node_settings.MODALITY_TRANSFORM_METHOD == "redaf":
+            self.modality_fuser = ReDAF(
+                embed_dim=node_settings.PRETRAINED_NODE_DIM,
+                num_modalities = 2,
+            )     
+        else:
+            self.modality_fuser = None
+
+        self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
 
         self.model = GGD(
             encoder=GCNEncoder(

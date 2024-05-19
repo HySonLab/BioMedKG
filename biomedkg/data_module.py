@@ -26,11 +26,12 @@ class PrimeKGModule(LightningDataModule):
         self.batch_size = batch_size
         self.encoder = encoder
 
-    def setup(self, stage : str = "split"):
+    def setup(self, stage : str = "split", embed_dim: int = None):
         self.primekg = PrimeKG(
             data_dir=self.data_dir,
             process_node_lst=self.process_node_lst,
             process_edge_lst=self.process_edge_lst,
+            embed_dim=embed_dim,
             encoder=self.encoder
         )
 

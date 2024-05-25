@@ -1,9 +1,8 @@
 import torch
+import torch.nn.functional as F
 import GCL.losses as L
 from GCL.models import SingleBranchContrast, DualBranchContrast
-import torch.nn.functional as F
-
-from typing import Callable
+from lightning import LightningModule
 from transformers.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
 from biomedkg.modules.gcl import DGI, GRACE, GGD
@@ -11,7 +10,6 @@ from biomedkg.modules import GCNEncoder
 from biomedkg.configs import node_settings
 from biomedkg.modules.fusion import AttentionFusion, ReDAF
 
-from lightning import LightningModule
 
 class DGIModule(LightningModule):
     def __init__(self,
@@ -45,6 +43,13 @@ class DGIModule(LightningModule):
             self.modality_fuser = None
 
         self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
+
+        self.save_hyperparameters(
+            {
+                "modality_fuser": node_settings.MODALITY_TRANSFORM_METHOD,
+                "modality_aggr": node_settings.MODALITY_MERGING_METHOD
+            }
+        )
 
         self.model = DGI(
             encoder=GCNEncoder(
@@ -207,6 +212,13 @@ class GRACEModule(LightningModule):
             self.modality_fuser = None
 
         self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
+
+        self.save_hyperparameters(
+            {
+                "modality_fuser": node_settings.MODALITY_TRANSFORM_METHOD,
+                "modality_aggr": node_settings.MODALITY_MERGING_METHOD
+            }
+        )
 
         self.model = GRACE(
             encoder=GCNEncoder(
@@ -373,6 +385,13 @@ class GGDModule(LightningModule):
             self.modality_fuser = None
 
         self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
+
+        self.save_hyperparameters(
+            {
+                "modality_fuser": node_settings.MODALITY_TRANSFORM_METHOD,
+                "modality_aggr": node_settings.MODALITY_MERGING_METHOD
+            }
+        )
 
         self.model = GGD(
             encoder=GCNEncoder(

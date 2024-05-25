@@ -61,17 +61,25 @@ class PrimeKG:
     
 
     def _build_node_embedding(self,):
+        self.modality_mapping = dict()
         self.mapping_dict = dict()
+
+        node_id = 0
 
         for node_type in tqdm(self.list_nodes, desc="Load node"):
             node_df = self.df[self.df['x_type'] == node_type]
             lst_node_name = set(node_df['x_name'].values)
 
+            node_mapping = dict()
             lst_node_name = sorted(lst_node_name)
-            
+            for index, node_name in enumerate(lst_node_name):
+                node_mapping[node_name] = index
+                self.mapping_dict[node_name] = node_id
+                node_id += 1
+                
             node_mapping = {node_name: index for index, node_name in enumerate(lst_node_name)}
 
-            self.mapping_dict[node_type] = node_mapping
+            self.modality_mapping[node_type] = node_mapping
             
             if self.encoder is not None:
                 embedding = self.encoder(lst_node_name)
@@ -95,8 +103,8 @@ class PrimeKG:
                 (self.df['x_type'] == head) & (self.df['y_type'] == tail)
                 ][['x_name', 'y_name']]
             
-            src = [self.mapping_dict[head][index] for index in node_pair_df['x_name']]
-            dst = [self.mapping_dict[tail][index] for index in node_pair_df['y_name']]
+            src = [self.modality_mapping[head][index] for index in node_pair_df['x_name']]
+            dst = [self.modality_mapping[tail][index] for index in node_pair_df['y_name']]
             
             edge_index = torch.tensor([src, dst])
 

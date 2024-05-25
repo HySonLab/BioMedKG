@@ -53,7 +53,19 @@ class KGEModule(LightningModule):
                 self.modality_fuser = None
 
             self.modality_aggr = node_settings.MODALITY_MERGING_METHOD
+
+            self.save_hyperparameters(
+                {
+                    "modality_fuser": node_settings.MODALITY_TRANSFORM_METHOD,
+                    "modality_aggr": node_settings.MODALITY_MERGING_METHOD
+                }
+            )
         
+        self.save_hyperparameters(
+                {
+                    "node_init_method": kge_settings.KGE_NODE_INIT_METHOD,
+                }
+            )
 
         if encoder_name == "rgcn":
             self.encoder = RGCN(

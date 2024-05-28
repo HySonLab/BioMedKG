@@ -3,10 +3,12 @@ import time
 import json
 import argparse
 
+
 import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+
 
 from biomedkg.kge_module import KGEModule
 from biomedkg.modules.node import EncodeNode, EncodeNodeWithModality
@@ -14,19 +16,34 @@ from biomedkg.data_module import PrimeKGModule
 from biomedkg.modules.utils import find_comet_api_key
 from biomedkg.configs import train_settings, kge_settings, data_settings, node_settings
 
+
 def parse_opt():
         parser = argparse.ArgumentParser()
         parser.add_argument(
-             '--task', 
-             type=str, 
-             action='store', 
-             choices=['train', 'test'], 
-             default='train', 
-             help="Do training or testing task")
-        
+             '--gcl_embed_path',
+             type=str,
+             default=None,
+             required=False,
+             help="Path to your GCL embedding")
+       
         parser.add_argument(
-             '--ckpt_path', 
-             type=str, 
+             '--node_init_method',
+             type=str,
+             default=kge_settings.KGE_NODE_INIT_METHOD,
+             required=False,
+             help="Node init method to train KGE")
+       
+        parser.add_argument(
+             '--task',
+             type=str,
+             action='store',
+             choices=['train', 'test'],
+             default='train',
+             help="Do training or testing task")
+       
+        parser.add_argument(
+             '--ckpt_path',
+             type=str,
              default=None,
              required=False,
              help="Path to checkpoint")
@@ -34,32 +51,33 @@ def parse_opt():
         return opt
 
 
-def main(task:str, ckpt_path:str = None):
+
+
+def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None, node_init_method:str=None):
     seed_everything(train_settings.SEED)
 
-    # Decide node intialize method
-    node_init_method = kge_settings.KGE_NODE_INIT_METHOD
 
     if node_init_method == "gcl":
         encoder = EncodeNode(
-            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "gcl_embed")
+            embed_path=gcl_embed_path
             )
     elif node_init_method == "llm":
         encoder = EncodeNodeWithModality(
-            entity_type=list(data_settings.NODES_LST), 
+            entity_type=list(data_settings.NODES_LST),
             embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
             )
     elif node_init_method == "random":
         encoder = None
     else:
         raise NotImplementedError
-    
+   
     if node_init_method == "gcl" or node_init_method == "random":
         embed_dim = node_settings.GCL_TRAINED_NODE_DIM
     elif node_init_method == "llm":
         embed_dim = node_settings.PRETRAINED_NODE_DIM
     else:
         embed_dim = None
+
 
     # Setup data module
     data_module = PrimeKGModule(
@@ -72,7 +90,9 @@ def main(task:str, ckpt_path:str = None):
         encoder=encoder,
     )
 
+
     data_module.setup(stage="split", embed_dim=embed_dim)
+
 
     # Initialize KGE Module
     model = KGEModule(
@@ -89,17 +109,20 @@ def main(task:str, ckpt_path:str = None):
         warm_up_ratio=train_settings.WARM_UP_RATIO,
     )
 
+
     # Setup logging/ckpt path
     if ckpt_path is None:
         exp_name = str(int(time.time()))
         ckpt_dir = os.path.join(train_settings.OUT_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
         log_dir = os.path.join(train_settings.LOG_DIR, "kge", f"{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
 
+
         if not os.path.exists(ckpt_dir):
             os.makedirs(ckpt_dir)
-        
+       
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
+
 
         with open(os.path.join(ckpt_dir, "node_mapping.json"), "w") as file:
             json.dump(data_module.primekg.mapping_dict, file, indent=4)
@@ -108,15 +131,17 @@ def main(task:str, ckpt_path:str = None):
         log_dir = ckpt_dir.replace(os.path.basename(train_settings.OUT_DIR), os.path.basename(train_settings.LOG_DIR))
         exp_name = str(os.path.basename(ckpt_dir).split("_")[-1])
 
+
     checkpoint_callback = ModelCheckpoint(
-        dirpath=ckpt_dir, 
-        monitor="val_loss", 
-        save_top_k=3, 
+        dirpath=ckpt_dir,
+        monitor="val_loss",
+        save_top_k=3,
         mode="min",
         save_last=True,
         )
-    
+   
     early_stopping = EarlyStopping(monitor="val_loss", mode="min")
+
 
     logger = CometLogger(
         api_key=find_comet_api_key(),
@@ -125,14 +150,16 @@ def main(task:str, ckpt_path:str = None):
         experiment_name=exp_name,
     )
 
+
     # Prepare trainer args
     trainer_args = {
-        "accelerator": "auto", 
+        "accelerator": "auto",
         "log_every_n_steps": 10,
         "default_root_dir": ckpt_dir,
-        "logger": logger, 
-        "deterministic": True, 
+        "logger": logger,
+        "deterministic": True,
     }
+
 
     # Setup multiple GPUs training
     if isinstance(train_settings.DEVICES, list) and len(train_settings.DEVICES) > 1:
@@ -150,26 +177,30 @@ def main(task:str, ckpt_path:str = None):
                 }
             )
 
+
     # Train
     if task == "train":
         trainer_args.update(
             {
                 "max_epochs": train_settings.EPOCHS,
                 "check_val_every_n_epoch": train_settings.VAL_EVERY_N_EPOCH,
-                "enable_checkpointing": True,     
+                "enable_checkpointing": True,    
                 "gradient_clip_val": 1.0,
                 "callbacks": [checkpoint_callback, early_stopping],
             }
         )
 
+
         trainer = Trainer(**trainer_args)
+
 
         trainer.fit(
             model=model,
             train_dataloaders=data_module.train_dataloader(loader_type="graph_saint"),
             val_dataloaders=data_module.val_dataloader(loader_type="graph_saint"),
-            ckpt_path=ckpt_path 
+            ckpt_path=ckpt_path
         )
+
 
     # Test
     elif task == "test":
@@ -179,9 +210,11 @@ def main(task:str, ckpt_path:str = None):
              dataloaders=data_module.test_dataloader(loader_type="graph_saint"),
              ckpt_path=ckpt_path,
         )
-    
+   
     else:
         raise NotImplementedError
+
+
 
 
 if __name__ == "__main__":

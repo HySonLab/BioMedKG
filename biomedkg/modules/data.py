@@ -123,5 +123,36 @@ class BioKG(TripletBase):
             encoder : dict = None
             ):
         # Prepare pd.DataFrame with 5 columns ['x_type', 'x_name', 'relation', 'y_type', 'y_name']
-        df = pd.read_csv(data_dir, delimiter="\t")
+        df = pd.read_csv(data_dir, delimiter="\t", names=["x_name", "relation", "y_name"])
+
+        # Initialize lists to store x_type and y_type
+        x_types = []
+        y_types = []
+
+        # Iterate through the DataFrame to determine x_type and y_type
+        for i in range(len(df)):
+            relation = df.iloc[i].relation
+
+            # Determine the types based on the relation
+            if "_" in relation:
+                x_type, y_type = map(str.lower, relation.split("_")[:2])
+            else:
+                x_type = "gene/protein" if relation[0] == "P" else "drug"
+                y_type = "gene/protein" if relation[1] == "P" else "drug"
+
+            # Append the types to the lists
+            x_types.append(x_type)
+            y_types.append(y_type)
+
+        # Add the new columns to the DataFrame
+        df['x_type'] = x_types
+        df['y_type'] = y_types
+
         super().__init__(df=df, embed_dim=embed_dim, encoder=encoder)
+
+if __name__ == "__main__":
+    biokg = BioKG("data/biokg.links-test.csv", 768)
+
+    print(biokg.df.head())
+
+    print("Test successful!")

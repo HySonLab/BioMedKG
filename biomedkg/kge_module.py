@@ -7,7 +7,7 @@ from torch_geometric.nn import GAE
 from torch_geometric.utils import negative_sampling
 from transformers.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
-from biomedkg.modules import RGCN, RGAT, DistMult, TransE
+from biomedkg.modules import RGCN, RGAT, DistMult, TransE, ComplEx
 from biomedkg.modules.fusion import AttentionFusion, ReDAF
 from biomedkg.configs import kge_settings, node_settings
 
@@ -95,6 +95,11 @@ class KGEModule(LightningModule):
             )
         elif decoder_name == "dismult":
             self.decoder = DistMult(
+                num_relations=num_relation,
+                hidden_channels=out_dim,
+            )
+        elif decoder_name == "complex":
+            self.decoder = ComplEx(
                 num_relations=num_relation,
                 hidden_channels=out_dim,
             )

@@ -1,58 +1,25 @@
 import os
 import torch
-import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
 from torch_geometric.data import HeteroData
 
 from biomedkg.modules.utils import clean_name
 
-class PrimeKG:
-
+class TripletBase:
     def __init__(
             self, 
-            data_dir : str,
-            process_node_lst : set[str],
-            process_edge_lst : set[str],
+            df : pd.DataFrame,
             embed_dim : int,
             encoder : dict = None,
             ):
-        
-        try:
-            from tdc.resource import PrimeKG
-
-            primekg = PrimeKG(path = data_dir)
-            self.df = primekg.df
-            
-        except ModuleNotFoundError:
-            csv_file = f"{data_dir}/kg.csv"
-            
-            if not os.path.exists(csv_file):
-                os.system(f"wget -O {csv_file} https://dataverse.harvard.edu/api/access/datafile/6180620")
-
-            self.df = pd.read_csv(csv_file, low_memory=False)
-
-        if process_node_lst:
-            self.df = self.df[self.df['x_type'].isin(list(process_node_lst)) & self.df['y_type'].isin(list(process_node_lst))]
-        
-        if process_edge_lst:
-            self.df = self.df[self.df['relation'].isin(list(process_edge_lst))]
-
-        self.data = HeteroData()
-
+        self.df = df
         self.list_nodes = self.df['x_type'].unique()
         self.list_edges = self.df['relation'].unique()
-
-        print("\nList of node types: ")
-        for node_name in self.list_nodes:
-            print(f"\t- {node_name}")
-
-        print(f"\nList of edge types:")
-        for edge_type in self.list_edges:
-            print(f"\t- {edge_type}")
-
         self.encoder = encoder
         self.embedding_dim = embed_dim
+
+        self.data = HeteroData()
 
     def get_data(self,):
         self._build_node_embedding()
@@ -113,3 +80,48 @@ class PrimeKG:
             relation = clean_name(relation)
 
             self.data[head, relation, tail].edge_index = edge_index
+
+
+class PrimeKG(TripletBase):
+    def __init__(
+            self, 
+            data_dir : str,
+            process_node_lst : set[str],
+            process_edge_lst : set[str],
+            embed_dim : int,
+            encoder : dict = None,
+            ):
+        
+        try:
+            from tdc.resource import PrimeKG
+
+            primekg = PrimeKG(path = data_dir)
+            df = primekg.df
+            
+        except ModuleNotFoundError:
+            csv_file = f"{data_dir}/kg.csv"
+            
+            if not os.path.exists(csv_file):
+                os.system(f"wget -O {csv_file} https://dataverse.harvard.edu/api/access/datafile/6180620")
+
+            df = pd.read_csv(csv_file, low_memory=False)
+
+        if process_node_lst:
+            df = df[df['x_type'].isin(list(process_node_lst)) & df['y_type'].isin(list(process_node_lst))]
+        
+        if process_edge_lst:
+            df = df[df['relation'].isin(list(process_edge_lst))]
+
+        super().__init__(df=df, embed_dim=embed_dim, encoder=encoder)
+
+
+class BioKG(TripletBase):
+    def __init__(
+            self,
+            data_dir : str,
+            embed_dim : int,
+            encoder : dict = None
+            ):
+        # Prepare pd.DataFrame with 5 columns ['x_type', 'x_name', 'relation', 'y_type', 'y_name']
+        df = pd.read_csv(data_dir, delimiter="\t")
+        super().__init__(df=df, embed_dim=embed_dim, encoder=encoder)

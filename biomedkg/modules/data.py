@@ -1,6 +1,8 @@
 import os
 import torch
 import pandas as pd
+import pickle 
+import numpy as np
 from tqdm.auto import tqdm
 from torch_geometric.data import HeteroData
 
@@ -14,7 +16,7 @@ class TripletBase:
             encoder : dict = None,
             ):
         self.df = df
-        self.list_nodes = self.df['x_type'].unique()
+        self.list_nodes = np.unique(np.concatenate([self.df['x_type'].unique(), self.df['y_type'].unique()]))
         self.list_edges = self.df['relation'].unique()
         self.encoder = encoder
         self.embedding_dim = embed_dim
@@ -34,8 +36,10 @@ class TripletBase:
         node_id = 0
 
         for node_type in tqdm(self.list_nodes, desc="Load node"):
-            node_df = self.df[self.df['x_type'] == node_type]
-            lst_node_name = set(node_df['x_name'].values)
+            node_df_x = self.df[self.df['x_type'] == node_type]
+            node_df_y = self.df[self.df['y_type'] == node_type]
+            lst_node_name = set(node_df_x['x_name'].values) | set(node_df_y['y_name'].values)
+
 
             node_mapping = dict()
             lst_node_name = sorted(lst_node_name)
@@ -47,7 +51,6 @@ class TripletBase:
             node_mapping = {node_name: index for index, node_name in enumerate(lst_node_name)}
 
             self.modality_mapping[node_type] = node_mapping
-            
             if self.encoder is not None:
                 embedding = self.encoder(lst_node_name)
             else:
@@ -80,6 +83,7 @@ class TripletBase:
             relation = clean_name(relation)
 
             self.data[head, relation, tail].edge_index = edge_index
+
 
 
 class PrimeKG(TripletBase):
@@ -119,11 +123,35 @@ class BioKG(TripletBase):
     def __init__(
             self,
             data_dir : str,
+            id_name_dirs: list,
             embed_dim : int,
             encoder : dict = None
             ):
         # Prepare pd.DataFrame with 5 columns ['x_type', 'x_name', 'relation', 'y_type', 'y_name']
         df = pd.read_csv(data_dir, delimiter="\t", names=["x_name", "relation", "y_name"])
+
+        def load_pickle_file(file_path):
+            with open(file_path, 'rb') as f:
+                return pickle.load(f)
+
+        def concatenate_pickles(file_paths):
+            combined_dict = {}
+            for file_path in file_paths:
+                current_dict = load_pickle_file(file_path)
+                combined_dict.update(current_dict)
+            return combined_dict
+
+        id_name_mapping = concatenate_pickles(id_name_dirs)
+
+        df["x_name"] = [
+            id_name_mapping[df.iloc[i]["x_name"]] if df.iloc[i]["x_name"] in id_name_mapping else ""
+            for i in range(len(df))
+        ]
+
+        df["y_name"] = [
+            id_name_mapping[df.iloc[i]["y_name"]] if df.iloc[i]["y_name"] in id_name_mapping else ""
+            for i in range(len(df))
+        ]
 
         # Initialize lists to store x_type and y_type
         x_types = []
@@ -151,8 +179,9 @@ class BioKG(TripletBase):
         super().__init__(df=df, embed_dim=embed_dim, encoder=encoder)
 
 if __name__ == "__main__":
-    biokg = BioKG("data/biokg.links-test.csv", 768)
+    biokg = BioKG("data/biokg.links-test.csv", ["data/drug_idname.pkl", "data/disease_idname.pkl", "data/gene_idname.pkl"], 768)
 
     print(biokg.df.head())
+    biokg.get_data()
 
     print("Test successful!")

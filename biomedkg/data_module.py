@@ -3,7 +3,7 @@ import torch_geometric.transforms as T
 from torch_geometric.loader import NeighborLoader, GraphSAINTRandomWalkSampler
 from typing import Callable
 
-from biomedkg.modules.data import PrimeKG
+from biomedkg.modules.data import PrimeKG, BioKG
 
 class PrimeKGModule(LightningDataModule):
     def __init__(
@@ -104,6 +104,121 @@ class PrimeKGModule(LightningDataModule):
     def test_dataloader(self, loader_type: str):
 
         assert loader_type in ["neighbor", "graph_saint"]
+
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.test_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+            )
+        elif loader_type == "graph_saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.test_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=200,
+                num_workers=0,
+            )
+        
+class BioKGModule(LightningDataModule):
+    def __init__(
+            self, 
+            data_dir: str, 
+            id_name_dirs: list,
+            batch_size: int = 64,
+            val_ratio: float = 0.05,
+            test_ratio: float = 0.15,
+            encoder: Callable = None,
+            neg_sampling_ratio: float = 10.0
+            ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.data_dir = data_dir
+        self.id_name_dirs = id_name_dirs
+        self.val_ratio = val_ratio
+        self.test_ratio = test_ratio
+        self.batch_size = batch_size
+        self.encoder = encoder # Knowledge graph embedding
+        self.neg_sampling_ratio = neg_sampling_ratio
+
+    def setup(self, stage: str = "split", embed_dim: int = None):
+        self.biokg = BioKG(
+            data_dir=self.data_dir,
+            id_name_dirs=self.id_name_dirs,
+            embed_dim=embed_dim,
+            encoder=self.encoder
+        )
+
+        self.data = self.biokg.get_data()
+
+        if stage == "split":
+            self.train_data, self.val_data, self.test_data = T.RandomLinkSplit(
+                num_val=self.val_ratio,
+                num_test=self.test_ratio,
+                neg_sampling_ratio=self.neg_sampling_ratio,
+            )(data=self.data)
+            
+    def subgraph_dataloader(self):
+        return NeighborLoader(
+            data=self.data,
+            num_neighbors=[-1],
+            num_workers=0,
+            shuffle=False,
+        )
+    
+    def all_dataloader(self):
+        return NeighborLoader(
+            data=self.data,
+            batch_size=self.batch_size,
+            num_neighbors=[30] * 3,
+            num_workers=0,
+        )
+
+    def train_dataloader(self, loader_type: str = "neighbor"):
+        
+        assert loader_type in ["neighbor", "graph_saint"], "Only supports neighbor and graph-saint loaders"
+
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.train_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+                shuffle=True,
+            )
+        elif loader_type == "graph_saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.train_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=1000,
+                num_workers=0,
+            )
+
+    def val_dataloader(self, loader_type: str):
+
+        assert loader_type in ["neighbor", "graph_saint"], "Only supports neighbor and graph-saint loaders"
+
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.val_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+            )
+        elif loader_type == "graph_saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.val_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=200,
+                num_workers=0,
+            )
+
+    def test_dataloader(self, loader_type: str):
+
+        assert loader_type in ["neighbor", "graph_saint"], "Only supports neighbor and graph-saint loaders"
 
         if loader_type == "neighbor":
             return NeighborLoader(

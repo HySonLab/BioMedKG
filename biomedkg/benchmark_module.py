@@ -30,7 +30,7 @@ class BenchmarkModule(LightningModule):
 
         self.save_hyperparameters()
 
-        self.load_pretrained_encoder(encoder_path)
+        # self.load_pretrained_encoder(encoder_path)
 
         # Scoring functions 
 
@@ -47,15 +47,10 @@ class BenchmarkModule(LightningModule):
         elif decoder_name == "complex":
             self.decoder = ComplEx(
                 num_relations=num_relation,
-                hidden_channels=out_dim*2
+                hidden_channels=out_dim
             )
         else:
             raise NotImplemented
-
-        self.model = GAE(
-            encoder=self.encoder,
-            decoder=self.decoder
-        )
         
         self.lr = learning_rate
         self.scheduler_type = scheduler_type
@@ -76,42 +71,6 @@ class BenchmarkModule(LightningModule):
 
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
-
-    def load_pretrained_encoder(self, path: str) -> Callable:
-
-        # Load checkpoint 
-        
-        checkpoint_path = path + '/last.ckpt'
-        checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-
-        updated_state_dict = OrderedDict()
-        for key, value in checkpoint["state_dict"].items():
-            # Split the key at the first instance of '.' and remove the prefix part
-            parts = key.split('.')
-            for i, part in enumerate(parts):
-                if part == "encoder" or part == "decoder":
-                    new_key = '.'.join(parts[i+1:])  # Join parts after "encoder" or "decoder"
-                    updated_state_dict[new_key] = value
-                    break
-                if i == len(parts) - 1:  # If no "encoder" or "decoder" found, use the original key
-                    updated_state_dict[key] = value
-
-        checkpoint["state_dict"] = updated_state_dict 
-        
-        # Load model 
-
-        model_name = path.split("_")[0]
-
-        if model_name == "rgcn":
-            self.encoder = RGCN()
-        elif model_name == "rgat":
-            self.encoder = RGAT()
-        else:
-            raise NotImplemented
-        
-        # Load the pre-trained encoder from the specified path.
-        self.encoder.load_state_dict(checkpoint)
-        
         
     def forward(self, x, edge_index, edge_type):
         return self.encoder(x, edge_index, edge_type)

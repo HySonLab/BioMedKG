@@ -133,23 +133,16 @@ class BioKG(TripletBase):
         def load_pickle_file(file_path):
             with open(file_path, 'rb') as f:
                 return pickle.load(f)
-
-        def concatenate_pickles(file_paths):
-            combined_dict = {}
-            for file_path in file_paths:
-                current_dict = load_pickle_file(file_path)
-                combined_dict.update(current_dict)
-            return combined_dict
-
-        id_name_mapping = concatenate_pickles(id_name_dirs)
+            
+        id_name_map = load_pickle_file("data/id_name_map.pkl")
 
         df["x_name"] = [
-            id_name_mapping[df.iloc[i]["x_name"]] if df.iloc[i]["x_name"] in id_name_mapping else ""
+            id_name_map[df.iloc[i]["x_name"]] if df.iloc[i]["x_name"] in id_name_map else df.iloc[i]["x_name"]
             for i in range(len(df))
         ]
 
         df["y_name"] = [
-            id_name_mapping[df.iloc[i]["y_name"]] if df.iloc[i]["y_name"] in id_name_mapping else ""
+            id_name_map[df.iloc[i]["y_name"]] if df.iloc[i]["y_name"] in id_name_map else df.iloc[i]["y_name"]
             for i in range(len(df))
         ]
 

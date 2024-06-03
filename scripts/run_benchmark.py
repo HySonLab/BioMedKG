@@ -30,12 +30,21 @@ def parse_opt():
              default=None,
              required=False,
              help="Path to your GCL embedding")
+
+        parser.add_argument(
+            '--k_in_hits@k',
+            type=int,
+            default=10,
+            required=True,
+            choices=[1, 3, 10],
+            help="k in hits@k"
+        )
         
         opt = parser.parse_args()
 
         return opt
 
-def main(model_name:str, gcl_embed_path:str=None):
+def main(model_name:str, gcl_embed_path:str=None, k:int=10):
     seed_everything(train_settings.SEED)
 
     encoder = EncodeNode(
@@ -98,7 +107,7 @@ def main(model_name:str, gcl_embed_path:str=None):
             rel_type=data.edge_type,
             tail_index=data.edge_index[1],
             batch_size=train_settings.BATCH_SIZE,
-            k=10, # Hits@k
+            k=k, # Hits@k
             log=True
         )
 
@@ -110,9 +119,9 @@ def main(model_name:str, gcl_embed_path:str=None):
             print(f'Epoch: {epoch:03d}'
                 f'Val MRR: {mrr:.4f}, Val Hits@10: {hits:.4f}')
 
-    rank, mrr, hits_at_10 = test(data_module.test_data)
+    rank, mrr, hits_at_k = test(data_module.test_data)
     print(f'Test Mean Rank: {rank:.2f}, Test MRR: {mrr:.4f}, '
-        f'Test Hits@10: {hits_at_10:.4f}')
+        f'Test Hits@{k}: {hits_at_k:.4f}')
 
 if __name__ == "__main__":
     main(**vars(parse_opt()))

@@ -201,6 +201,7 @@ def main(
     # Test
     elif task == "test":
         assert ckpt_path is not None, "Please specify checkpoint path."
+        trainer = Trainer(**trainer_args)
         trainer.test(
              model=model,
              dataloaders=data_module.test_dataloader(loader_type="neighbor"),

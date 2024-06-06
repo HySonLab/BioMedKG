@@ -67,16 +67,18 @@ Run the following command to execute Link Prediction on Knowledge Graph Embeddin
 python scripts/train_kge.py
 ```
 
-## Benchmark
-This module allows testing knowledge graph embedding training framework on BioKG knowledge graph. To perform this, we map node names and embeddings trained on PrimeKG++ and then use this mapping for link prediction in nodes in BioKG, nodes that are not trained with PrimeKG++ are randomized.
+## Benchmark on FDI-DPA
 
 ### Additional data requirements:
-have "data/id_name_map.pkl" to map from id (mondo, drugbank, uniprot) to node name.]
+* Download `dpi_fda.csv` to `data/benchmarks/`
+* Download `dpi_drug_feature.csv` to `data/modalities/`
+* Download `dpi_gene_feature.csv` to `data/modalities/`
+
 
 ### Benchmark 
-Run the following command to execute Link Prediction on Knowledge Graph Embedding:
+Run the following command to execute Link Prediction on DPI-FDA dataset:
 ```
-python scripts/run_benchmark.py --model_name --gcl_embed
+python scripts/train_kge.py --gcl_embed_path ./data/gcl_embed/*/ --ckpt_path ./ckpt/kge/*/*.ckpt --run_benchmark
 ```
 
 ## Contributors:

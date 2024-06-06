@@ -147,6 +147,7 @@ class BioKGModule(LightningDataModule):
         )
 
         self.data = self.biokg.get_data()
+        self.data = T.ToUndirected()(self.data)
 
         if stage == "split":
             self.train_data, self.val_data, self.test_data = T.RandomLinkSplit(

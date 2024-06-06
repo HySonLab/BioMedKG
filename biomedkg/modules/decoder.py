@@ -8,7 +8,6 @@ class Decoder(torch.nn.Module):
         super().__init__()
         self.hidden_channels = hidden_channels
         self.rel_emb = torch.nn.Parameter(torch.empty(num_relations, hidden_channels))
-        self.rel_emb_imag = torch.nn.Parameter(torch.empty(num_relations, hidden_channels))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -50,12 +49,12 @@ class DistMult(Decoder):
     
 class ComplEx(Decoder):
     def __init__(self, num_relations, hidden_channels):
-        hidden_channels //= 2
-        super().__init__(num_relations, hidden_channels)
         self.rel_emb_imag = torch.nn.Parameter(torch.empty(num_relations, hidden_channels))
-        self.reset_parameters()
+
+        super().__init__(num_relations, hidden_channels)
 
     def reset_parameters(self):
+        torch.nn.init.xavier_uniform_(self.rel_emb)
         torch.nn.init.xavier_uniform_(self.rel_emb_imag)
 
     def forward(self, z, edge_index, edge_type):

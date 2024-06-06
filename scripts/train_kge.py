@@ -3,16 +3,14 @@ import time
 import json
 import argparse
 
-
 import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
-
 from biomedkg.kge_module import KGEModule
 from biomedkg.modules.node import EncodeNode, EncodeNodeWithModality
-from biomedkg.data_module import PrimeKGModule
+from biomedkg.data_module import PrimeKGModule, BioKGModule
 from biomedkg.modules.utils import find_comet_api_key
 from biomedkg.configs import train_settings, kge_settings, data_settings, node_settings
 
@@ -41,11 +39,21 @@ def parse_opt():
              default=None,
              required=False,
              help="Path to your GCL embedding")
+
+        parser.add_argument(
+             '--run_benchmark',
+             action="store_true",
+             help="Path to your GCL embedding")
         
         opt = parser.parse_args()
         return opt
 
-def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None):
+def main(
+        task:str, 
+        ckpt_path: str = None, 
+        gcl_embed_path: str = None,
+        run_benchmark: bool = False,
+        ):
     seed_everything(train_settings.SEED)
 
     embed_dim = None
@@ -70,18 +78,33 @@ def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None):
         raise NotImplementedError
 
     # Setup data module
-    data_module = PrimeKGModule(
-        encoder=encoder,
-    )
-
-    data_module.setup(stage="split", embed_dim=embed_dim)
-
+    if run_benchmark:
+        data_module = BioKGModule(
+            encoder=encoder
+        )
+        data_module.setup(stage="split", embed_dim=embed_dim)
+    else:
+        data_module = PrimeKGModule(
+            encoder=encoder,
+        )
+    
+        data_module.setup(stage="split", embed_dim=embed_dim)
 
     # Initialize KGE Module
     model = KGEModule(
         in_dim=embed_dim,
-        num_relation=data_module.data.num_edge_types,
+        num_relation=8,
     )
+
+    if run_benchmark:
+        assert ckpt_path is not None
+
+        model = KGEModule.load_from_checkpoint(ckpt_path)
+    else:
+        model = KGEModule(
+            in_dim=embed_dim,
+            num_relation=data_module.data.num_edge_types,
+        )
 
     # Setup logging/ckpt path
     if ckpt_path is None:
@@ -113,8 +136,7 @@ def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None):
         save_last=True,
         )
    
-    early_stopping = EarlyStopping(monitor="val_loss", mode="min")
-
+    early_stopping = EarlyStopping(monitor="val_loss", mode="min", min_delta=0.0001)
 
     logger = CometLogger(
         api_key=find_comet_api_key(),
@@ -122,7 +144,6 @@ def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None):
         save_dir=log_dir,
         experiment_name=exp_name,
     )
-
 
     # Prepare trainer args
     trainer_args = {
@@ -150,7 +171,6 @@ def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None):
                 }
             )
 
-
     # Train
     if task == "train":
         trainer_args.update(
@@ -163,9 +183,7 @@ def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None):
             }
         )
 
-
         trainer = Trainer(**trainer_args)
-
 
         trainer.fit(
             model=model,

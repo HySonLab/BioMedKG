@@ -125,7 +125,6 @@ class BioKGModule(LightningDataModule):
     def __init__(
             self, 
             data_dir: str, 
-            id_name_dirs: list,
             batch_size: int = 64,
             val_ratio: float = 0.05,
             test_ratio: float = 0.15,
@@ -135,7 +134,6 @@ class BioKGModule(LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
         self.data_dir = data_dir
-        self.id_name_dirs = id_name_dirs
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
         self.batch_size = batch_size
@@ -145,7 +143,6 @@ class BioKGModule(LightningDataModule):
     def setup(self, stage: str = "split", embed_dim: int = None):
         self.biokg = BioKG(
             data_dir=self.data_dir,
-            id_name_dirs=self.id_name_dirs,
             embed_dim=embed_dim,
             encoder=self.encoder
         )

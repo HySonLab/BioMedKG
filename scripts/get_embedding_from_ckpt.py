@@ -7,7 +7,7 @@ import argparse
 from pathlib import Path
 from tqdm.auto import tqdm
 from biomedkg import gcl_module, kge_module
-from biomedkg.data_module import PrimeKGModule
+from biomedkg.data_module import PrimeKGModule, BioKGModule
 from biomedkg.modules.node import EncodeNodeWithModality, EncodeNode
 from biomedkg.configs import data_settings, train_settings, node_settings, kge_settings
 from biomedkg.modules.utils import find_device
@@ -23,14 +23,22 @@ def parse_opt():
             default=None,
             required=False,
             help="Path to ckpt file")
+
+    parser.add_argument(
+        'data',
+        type=str,
+        default="primekg",
+        required=True,
+        choices=["primekg", "biokg"],
+        help="Choose either primekg or biokg(both biokg and dpi_fda)"
+    )
     opt = parser.parse_args()
     return opt
 
 
-
-
 def main(
         ckpt:str,
+        data:str
 ):
     assert os.path.exists(ckpt)
 
@@ -69,18 +77,28 @@ def main(
         else:
             process_node = [node_type]
 
-
-        data_module = PrimeKGModule(
-            data_dir=data_settings.DATA_DIR,
-            process_node_lst=process_node,
-            process_edge_lst=data_settings.EDGES_LST,
-            batch_size=train_settings.BATCH_SIZE,
-            encoder=EncodeNodeWithModality(
-                entity_type=node_type,
-                embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR),"embed")
+        if data == "primekg":
+            data_module = PrimeKGModule(
+                data_dir=data_settings.DATA_DIR,
+                process_node_lst=process_node,
+                process_edge_lst=data_settings.EDGES_LST,
+                batch_size=train_settings.BATCH_SIZE,
+                encoder=EncodeNodeWithModality(
+                    entity_type=node_type,
+                    embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR),"embed")
                 )
-        )
-
+            )
+        elif data == "biokg":
+            data_module = BioKGModule(
+                data_dir=data_settings.DATA_DIR,
+                batch_size=train_settings.BATCH_SIZE,
+                encoder=EncodeNodeWithModality(
+                    entity_type=node_type,
+                    embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR),"embed")
+                )
+            )
+        else:
+            raise NotImplementedError
 
         data_module.setup(stage="split", embed_dim=node_settings.PRETRAINED_NODE_DIM)
     else:
@@ -114,16 +132,26 @@ def main(
 
 
         # Setup data module
-        data_module = PrimeKGModule(
-            data_dir=data_settings.DATA_DIR,
-            process_node_lst=data_settings.NODES_LST,
-            process_edge_lst=data_settings.EDGES_LST,
-            batch_size=train_settings.BATCH_SIZE,
-            val_ratio=train_settings.VAL_RATIO,
-            test_ratio=train_settings.TEST_RATIO,
-            encoder=encoder,
-        )
-
+        if data == "primekg":
+            data_module = PrimeKGModule(
+                data_dir=data_settings.DATA_DIR,
+                process_node_lst=data_settings.NODES_LST,
+                process_edge_lst=data_settings.EDGES_LST,
+                batch_size=train_settings.BATCH_SIZE,
+                val_ratio=train_settings.VAL_RATIO,
+                test_ratio=train_settings.TEST_RATIO,
+                encoder=encoder,
+            )
+        elif data == "biokg":
+            data_module = BioKGModule(
+                data_dir=data_settings.DATA_DIR,
+                batch_size=train_settings.BATCH_SIZE,
+                val_ratio=train_settings.VAL_RATIO,
+                test_ratio=train_settings.TEST_RATIO,
+                encoder=encoder
+            )
+        else:
+            raise NotImplementedError
 
         data_module.setup(stage="split", embed_dim=embed_dim)
 

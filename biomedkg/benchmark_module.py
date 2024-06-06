@@ -1,36 +1,60 @@
 from typing import Callable
 from collections import OrderedDict
-import os
 
 import torch
 import torch.nn.functional as F
 from lightning import LightningModule
-from torchmetrics import MetricCollection, AUROC, AveragePrecision, RetrievalMRR, RetrievalHitRate
+from torchmetrics import MetricCollection, AUROC, AveragePrecision
+from torchmetrics.retrieval import  RetrievalMRR, RetrievalHitRate
 
 from torch_geometric.nn import GAE
 from torch_geometric.utils import negative_sampling
 from transformers.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
+from biomedkg.configs import kge_settings
 from biomedkg.modules import DistMult, TransE, ComplEx
 from biomedkg.modules.encoder import RGAT, RGCN
 
 class BenchmarkModule(LightningModule):
     def __init__(self,
-                 encoder_path: str,
-                 decoder_name : str,
-                 out_dim : int,
-                 num_relation : int,
-                 scheduler_type : str = "cosine",
-                 learning_rate: float = 2e-4,
-                 warm_up_ratio: float = 0.03,
+                model_path: str,
+                out_dim : int,
+                in_dim : int,
+                hidden_dim : int,
+                num_hidden_layers : int,
+                num_relation : int,
+                scheduler_type : str = "cosine",
+                learning_rate: float = 2e-4,
+                warm_up_ratio: float = 0.03,
                  ):
         super().__init__()
-        assert decoder_name in ["transe", "dismult", "complex"], "Only support 'transe', 'dismult', 'complex'."
+        # assert decoder_name in ["transe", "dismult", "complex"], "Only support 'transe', 'dismult', 'complex'."
         assert scheduler_type in ["linear", "cosine"], "Only support 'cosine' and 'linear'"
 
         self.save_hyperparameters()
 
-        # self.load_pretrained_encoder(encoder_path)
+        # Load model 
+
+        encoder_name, decoder_name = model_path.split("/")[-1].split("_")[0], model_path.split("/")[-1].split("_")[1]
+
+        if encoder_name == "rgcn":
+            self.encoder = RGCN(
+                in_dim=in_dim,
+                hidden_dim=hidden_dim,
+                out_dim=out_dim,
+                num_hidden_layers=num_hidden_layers,
+                num_relations=num_relation
+            )
+        elif encoder_name == "rgat":
+            self.encoder = RGAT(
+                in_dim=in_dim,
+                hidden_dim=hidden_dim,
+                out_dim=out_dim,
+                num_hidden_layers=num_hidden_layers,
+                num_relations=num_relation
+            )
+        else:
+            raise NotImplemented
 
         # Scoring functions 
 
@@ -47,10 +71,17 @@ class BenchmarkModule(LightningModule):
         elif decoder_name == "complex":
             self.decoder = ComplEx(
                 num_relations=num_relation,
-                hidden_channels=out_dim
+                hidden_channels=out_dim*2
             )
         else:
             raise NotImplemented
+        
+        self.load_pretrained_checkpoint(model_path)
+
+        self.model = GAE(
+            encoder=self.encoder,
+            decoder=self.decoder
+        )
         
         self.lr = learning_rate
         self.scheduler_type = scheduler_type
@@ -62,15 +93,45 @@ class BenchmarkModule(LightningModule):
             [
                 AUROC(task="binary"),
                 AveragePrecision(task="binary"),
-                RetrievalHitRate(top_k=1),
-                RetrievalHitRate(top_k=3),
+                # RetrievalHitRate(top_k=1),
+                # RetrievalHitRate(top_k=3),
                 RetrievalHitRate(top_k=10),
-                RetrievalMRR
+                RetrievalMRR()
             ]
         )
 
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
+
+    def load_pretrained_checkpoint(self, path: str) -> Callable:
+
+        # Load checkpoint 
+        
+        checkpoint_path = path + '/last.ckpt'
+        checkpoint = torch.load(checkpoint_path, map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+
+        updated_state_dict = OrderedDict()
+        for key, value in checkpoint["state_dict"].items():
+            # Split the key at the first instance of '.' and remove the prefix part
+            parts = key.split('.')
+            for i, part in enumerate(parts):
+                if part in ["encoder", "decoder", "modality_fusion"]:
+                    new_key = '.'.join(parts[i+1:])  # Join parts after "encoder" or "decoder"
+                    updated_state_dict[new_key] = value
+                    break
+                if i == len(parts) - 1:  # If no "encoder" or "decoder" found, use the original key
+                    updated_state_dict[key] = value
+
+        # model_state_dict = self.encoder.state_dict()
+        # updated_state_dict = {k: v for k, v in updated_state_dict.items() if k in model_state_dict and v.size() == model_state_dict[k].size()}
+        # model_state_dict.update(updated_state_dict)
+
+        # checkpoint["state_dict"] = updated_state_dict 
+        
+        # Load the pre-trained encoder from the specified path.
+        self.encoder.load_state_dict(updated_state_dict, strict=False)
+        self.decoder.load_state_dict(updated_state_dict, strict=False)
+        
         
     def forward(self, x, edge_index, edge_type):
         return self.encoder(x, edge_index, edge_type)
@@ -159,19 +220,20 @@ class BenchmarkModule(LightningModule):
 
 
 if __name__ == "__main__":
-    encoder_path = "ckpt/kge/rgcn_dismult_1716172122"
-    decoder_name = "complex"  # Choose from "transe", "dismult", "complex"
+    model_path = "ckpt/kge/rgcn_dismult_1716172122"
     out_dim = 128
-    num_relation = 10
+    num_relation = 8
     scheduler_type = "cosine"
     learning_rate = 2e-4
     warm_up_ratio = 0.03
 
     # Create the BenchmarkModule instance
     benchmark_module = BenchmarkModule(
-        encoder_path=encoder_path,
-        decoder_name=decoder_name,
+        model_path=model_path,
         out_dim=out_dim,
+        in_dim=128,
+        hidden_dim=128,
+        num_hidden_layers=2,
         num_relation=num_relation,
         scheduler_type=scheduler_type,
         learning_rate=learning_rate,
@@ -181,3 +243,7 @@ if __name__ == "__main__":
     # Print the encoder to check if it has been loaded correctly
     print("Loaded Encoder:")
     print(benchmark_module.encoder)
+
+    print("Loaded Decoder:")
+    print(benchmark_module.decoder)
+

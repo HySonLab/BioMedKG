@@ -123,56 +123,16 @@ class BioKG(TripletBase):
     def __init__(
             self,
             data_dir : str,
-            id_name_dirs: list,
             embed_dim : int,
             encoder : dict = None
             ):
         # Prepare pd.DataFrame with 5 columns ['x_type', 'x_name', 'relation', 'y_type', 'y_name']
-        df = pd.read_csv(data_dir, delimiter="\t", names=["x_name", "relation", "y_name"])
-
-        def load_pickle_file(file_path):
-            with open(file_path, 'rb') as f:
-                return pickle.load(f)
-            
-        id_name_map = load_pickle_file("data/id_name_map.pkl")
-
-        df["x_name"] = [
-            id_name_map[df.iloc[i]["x_name"]] if df.iloc[i]["x_name"] in id_name_map else df.iloc[i]["x_name"]
-            for i in range(len(df))
-        ]
-
-        df["y_name"] = [
-            id_name_map[df.iloc[i]["y_name"]] if df.iloc[i]["y_name"] in id_name_map else df.iloc[i]["y_name"]
-            for i in range(len(df))
-        ]
-
-        # Initialize lists to store x_type and y_type
-        x_types = []
-        y_types = []
-
-        # Iterate through the DataFrame to determine x_type and y_type
-        for i in range(len(df)):
-            relation = df.iloc[i].relation
-
-            # Determine the types based on the relation
-            if "_" in relation:
-                x_type, y_type = map(str.lower, relation.split("_")[:2])
-            else:
-                x_type = "gene/protein" if relation[0] == "P" else "drug"
-                y_type = "gene/protein" if relation[1] == "P" else "drug"
-
-            # Append the types to the lists
-            x_types.append(x_type)
-            y_types.append(y_type)
-
-        # Add the new columns to the DataFrame
-        df['x_type'] = x_types
-        df['y_type'] = y_types
+        df = pd.read_csv(data_dir,)
 
         super().__init__(df=df, embed_dim=embed_dim, encoder=encoder)
 
 if __name__ == "__main__":
-    biokg = BioKG("data/biokg.links-test.csv", ["data/drug_idname.pkl", "data/disease_idname.pkl", "data/gene_idname.pkl"], 768)
+    biokg = BioKG("data/dpi_fda_c.csv", 768)
 
     print(biokg.df.head())
     biokg.get_data()

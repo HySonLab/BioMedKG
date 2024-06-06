@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from lightning import LightningModule
-from torchmetrics import MetricCollection, AUROC, AveragePrecision
+from torchmetrics import MetricCollection, AUROC, AveragePrecision, F1Score
 
 from torch_geometric.nn import GAE
 from torch_geometric.utils import negative_sampling
@@ -119,6 +119,7 @@ class KGEModule(LightningModule):
             [
                 AUROC(task="binary"),
                 AveragePrecision(task="binary"),
+                F1Score(task="binary"),
             ]
         )
         self.valid_metrics = metrics.clone(prefix="val_")

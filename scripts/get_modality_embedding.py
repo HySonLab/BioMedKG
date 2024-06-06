@@ -2,6 +2,7 @@ import os
 import yaml
 import glob
 import pickle
+import argparse
 import pandas as pd
 from typing import List
 from pathlib import Path
@@ -65,41 +66,53 @@ def get_feature(
 
 
 if __name__ == "__main__":
-    with open("modality.yaml", "r") as file:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--yaml_file', "-f", type=str, help='The path to the YAML file')
+    args = parser.parse_args()
+
+    yaml_file = args.yaml_file
+
+    with open(yaml_file, "r") as file:
         data = yaml.load(file, Loader=yaml.SafeLoader)
-    
-    for entity_type in data.keys():
-        if entity_type == "gene/protein":
-            gene_protein = data[entity_type]
-            for gene_type in gene_protein.keys():
-                entity = gene_protein[gene_type]
+
+    if "primekg" in yaml_file:
+        
+        for entity_type in data.keys():
+            if entity_type == "gene/protein":
+                gene_protein = data[entity_type]
+                for gene_type in gene_protein.keys():
+                    entity = gene_protein[gene_type]
+                    get_feature(**entity)
+            else:
+                entity = data[entity_type]
                 get_feature(**entity)
-        else:
+
+        # Merge amino_acid and dna for gene/protein  
+        embed_path = "data/embed"
+        pickle_files = glob.glob(embed_path + "/protein*pickle")  
+
+        protein_desc = dict()
+        protein_seq = dict()
+
+        for pickle_file in pickle_files:
+            file_name = Path(pickle_file).stem
+            modality_name = file_name.split("_")[-2]
+
+            with open(pickle_file, "rb") as file:
+                data = pickle.load(file=file)
+
+            if modality_name == "desc":
+                protein_desc.update(data)
+            else:
+                protein_seq.update(data)
+
+        with open(os.path.join(embed_path, "gene_seq_proteinbert_dna_bert.pickle"), "wb") as file:
+            pickle.dump(protein_seq, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+        with open(os.path.join(embed_path, "gene_desc_biobert.pickle"), "wb") as file:
+            pickle.dump(protein_desc, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    else:    
+        for entity_type in data.keys():
             entity = data[entity_type]
             get_feature(**entity)
-
-    # Merge amino_acid and dna for gene/protein  
-    embed_path = "data/embed"
-    pickle_files = glob.glob(embed_path + "/protein*pickle")  
-
-    protein_desc = dict()
-    protein_seq = dict()
-
-    for pickle_file in pickle_files:
-        file_name = Path(pickle_file).stem
-        modality_name = file_name.split("_")[-2]
-
-        with open(pickle_file, "rb") as file:
-            data = pickle.load(file=file)
-
-        if modality_name == "desc":
-            protein_desc.update(data)
-        else:
-            protein_seq.update(data)
-
-    with open(os.path.join(embed_path, "gene_seq_proteinbert_dna_bert.pickle"), "wb") as file:
-        pickle.dump(protein_seq, file, protocol=pickle.HIGHEST_PROTOCOL)
-
-    with open(os.path.join(embed_path, "gene_desc_biobert.pickle"), "wb") as file:
-        pickle.dump(protein_desc, file, protocol=pickle.HIGHEST_PROTOCOL)
-            

@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from biomedkg import gcl_module, kge_module
 from biomedkg.data_module import PrimeKGModule, BioKGModule
 from biomedkg.modules.node import EncodeNodeWithModality, EncodeNode
-from biomedkg.configs import data_settings, train_settings, node_settings, kge_settings
+from biomedkg.configs import data_settings, train_settings, node_settings
 from biomedkg.modules.utils import find_device
 from lightning import seed_everything
 
@@ -56,8 +56,6 @@ def main(
     # with open(json_file, "r") as file:
     #     mapping_dict = json.load(file)
 
-
-
     if re.search(r"gcl", dir_name):
         if model_name == "dgi":
             model = gcl_module.DGIModule.load_from_checkpoint(ckpt)
@@ -68,9 +66,7 @@ def main(
         else:
             raise NotImplementedError
 
-
         node_type = dir_name.split("_")[1]
-
 
         if node_type == "gene":
             process_node = ['gene/protein']
@@ -79,10 +75,7 @@ def main(
 
         if data == "primekg":
             data_module = PrimeKGModule(
-                data_dir=data_settings.DATA_DIR,
                 process_node_lst=process_node,
-                process_edge_lst=data_settings.EDGES_LST,
-                batch_size=train_settings.BATCH_SIZE,
                 encoder=EncodeNodeWithModality(
                     entity_type=node_type,
                     embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR),"embed")
@@ -90,8 +83,6 @@ def main(
             )
         elif data == "biokg":
             data_module = BioKGModule(
-                data_dir=data_settings.DATA_DIR,
-                batch_size=train_settings.BATCH_SIZE,
                 encoder=EncodeNodeWithModality(
                     entity_type=node_type,
                     embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR),"embed")
@@ -108,46 +99,32 @@ def main(
         # Decide node intialize method
         node_init_method = model.hparams.node_init_method
 
+        embed_dim = None
 
         if node_init_method == "gcl":
             encoder = EncodeNode(
                 embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), f"gcl_embed/{data}_{model_name}_{modality_transform}")
                 )
+            embed_dim = node_settings.GCL_TRAINED_NODE_DIM
         elif node_init_method == "llm":
             encoder = EncodeNodeWithModality(
                 entity_type=list(data_settings.NODES_LST),
                 embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
                 )
+            embed_dim = node_settings.PRETRAINED_NODE_DIM
         elif node_init_method == "random":
             encoder = None
+            embed_dim = node_settings.GCL_TRAINED_NODE_DIM
         else:
             raise NotImplementedError
-       
-        if node_init_method == "gcl" or node_init_method == "random":
-            embed_dim = node_settings.GCL_TRAINED_NODE_DIM
-        elif node_init_method == "llm":
-            embed_dim = node_settings.PRETRAINED_NODE_DIM
-        else:
-            embed_dim = None
-
 
         # Setup data module
         if data == "primekg":
             data_module = PrimeKGModule(
-                data_dir=data_settings.DATA_DIR,
-                process_node_lst=data_settings.NODES_LST,
-                process_edge_lst=data_settings.EDGES_LST,
-                batch_size=train_settings.BATCH_SIZE,
-                val_ratio=train_settings.VAL_RATIO,
-                test_ratio=train_settings.TEST_RATIO,
                 encoder=encoder,
             )    
         elif data == "biokg":
             data_module = BioKGModule(
-                data_dir=data_settings.DATA_DIR,
-                batch_size=train_settings.BATCH_SIZE,
-                val_ratio=train_settings.VAL_RATIO,
-                test_ratio=train_settings.TEST_RATIO,
                 encoder=encoder
             )
         else:

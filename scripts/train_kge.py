@@ -19,19 +19,6 @@ from biomedkg.configs import train_settings, kge_settings, data_settings, node_s
 
 def parse_opt():
         parser = argparse.ArgumentParser()
-        parser.add_argument(
-             '--gcl_embed_path',
-             type=str,
-             default=None,
-             required=False,
-             help="Path to your GCL embedding")
-       
-        parser.add_argument(
-             '--node_init_method',
-             type=str,
-             default=kge_settings.KGE_NODE_INIT_METHOD,
-             required=False,
-             help="Node init method to train KGE")
        
         parser.add_argument(
              '--task',
@@ -47,68 +34,54 @@ def parse_opt():
              default=None,
              required=False,
              help="Path to checkpoint")
+        
+        parser.add_argument(
+             '--gcl_embed_path',
+             type=str,
+             default=None,
+             required=False,
+             help="Path to your GCL embedding")
+        
         opt = parser.parse_args()
         return opt
 
-
-
-
-def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None, node_init_method:str=None):
+def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None):
     seed_everything(train_settings.SEED)
 
+    embed_dim = None
+    node_init_method = kge_settings.KGE_NODE_INIT_METHOD
 
     if node_init_method == "gcl":
+        assert gcl_embed_path is not None
         encoder = EncodeNode(
             embed_path=gcl_embed_path
             )
+        embed_dim = node_settings.GCL_TRAINED_NODE_DIM
     elif node_init_method == "llm":
         encoder = EncodeNodeWithModality(
             entity_type=list(data_settings.NODES_LST),
             embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
             )
+        embed_dim = node_settings.PRETRAINED_NODE_DIM
     elif node_init_method == "random":
         encoder = None
+        embed_dim = node_settings.GCL_TRAINED_NODE_DIM
     else:
         raise NotImplementedError
-   
-    if node_init_method == "gcl" or node_init_method == "random":
-        embed_dim = node_settings.GCL_TRAINED_NODE_DIM
-    elif node_init_method == "llm":
-        embed_dim = node_settings.PRETRAINED_NODE_DIM
-    else:
-        embed_dim = None
-
 
     # Setup data module
     data_module = PrimeKGModule(
-        data_dir=data_settings.DATA_DIR,
-        process_node_lst=data_settings.NODES_LST,
-        process_edge_lst=data_settings.EDGES_LST,
-        batch_size=train_settings.BATCH_SIZE,
-        val_ratio=train_settings.VAL_RATIO,
-        test_ratio=train_settings.TEST_RATIO,
         encoder=encoder,
     )
-
 
     data_module.setup(stage="split", embed_dim=embed_dim)
 
 
     # Initialize KGE Module
     model = KGEModule(
-        encoder_name=kge_settings.KGE_ENCODER,
-        decoder_name=kge_settings.KGE_DECODER,
         in_dim=embed_dim,
-        hidden_dim=kge_settings.KGE_HIDDEN_DIM,
-        out_dim=node_settings.KGE_TRAINED_NODE_DIM,
-        num_hidden_layers=kge_settings.KGE_NUM_HIDDEN,
         num_relation=data_module.data.num_edge_types,
-        num_heads=kge_settings.KGE_NUM_HEAD,
-        scheduler_type=train_settings.SCHEDULER_TYPE,
-        learning_rate=train_settings.LEARNING_RATE,
-        warm_up_ratio=train_settings.WARM_UP_RATIO,
     )
-
 
     # Setup logging/ckpt path
     if ckpt_path is None:
@@ -170,7 +143,7 @@ def main(task:str, ckpt_path:str = None, gcl_embed_path:str=None, node_init_meth
             }
         )
     else:
-        if torch.cuda.device_count() > 0:
+        if torch.cuda.device_count() > 1:
             trainer_args.update(
                 {
                     "devices": train_settings.DEVICES,

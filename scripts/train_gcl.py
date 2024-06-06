@@ -67,12 +67,7 @@ def main(
         process_node = [node_type]
 
     data_module = PrimeKGModule(
-        data_dir=data_settings.DATA_DIR,
         process_node_lst=process_node,
-        process_edge_lst=data_settings.EDGES_LST,
-        batch_size=train_settings.BATCH_SIZE,
-        val_ratio=train_settings.VAL_RATIO,
-        test_ratio=train_settings.TEST_RATIO,
         encoder=EncodeNodeWithModality(
             entity_type=node_type, 
             embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
@@ -170,7 +165,7 @@ def main(
             }
         )
     else:
-        if torch.cuda.device_count() > 0:
+        if torch.cuda.device_count() > 1:
             trainer_args.update(
                 {
                     "devices": train_settings.DEVICES,

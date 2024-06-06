@@ -9,21 +9,21 @@ from transformers.optimization import get_cosine_schedule_with_warmup, get_linea
 
 from biomedkg.modules import RGCN, RGAT, DistMult, TransE, ComplEx
 from biomedkg.modules.fusion import AttentionFusion, ReDAF
-from biomedkg.configs import kge_settings, node_settings
+from biomedkg.configs import kge_settings, node_settings, train_settings, data
 
 class KGEModule(LightningModule):
     def __init__(self,
-                 encoder_name : str,
-                 decoder_name : str,
-                 in_dim : int,
-                 hidden_dim : int,
-                 out_dim : int,
-                 num_hidden_layers : int,
-                 num_relation : int,
-                 num_heads : int,
-                 scheduler_type : str = "cosine",
-                 learning_rate: float = 2e-4,
-                 warm_up_ratio: float = 0.03,
+                encoder_name:str = kge_settings.KGE_ENCODER,
+                decoder_name: str = kge_settings.KGE_DECODER,
+                in_dim: int = 128,
+                hidden_dim: int = kge_settings.KGE_HIDDEN_DIM,
+                out_dim: int = node_settings.KGE_TRAINED_NODE_DIM,
+                num_hidden_layers: int = kge_settings.KGE_NUM_HIDDEN,
+                num_relation: int = 8,
+                num_heads: int =kge_settings.KGE_NUM_HEAD,
+                scheduler_type : str = train_settings.SCHEDULER_TYPE,
+                learning_rate: float = train_settings.LEARNING_RATE,
+                warm_up_ratio : float = train_settings.WARM_UP_RATIO
                  ):
         super().__init__()
         assert encoder_name in ["rgcn", "rgat"], "Only support 'rgcn' and 'rgat'."

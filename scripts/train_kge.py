@@ -3,6 +3,7 @@ import time
 import json
 import argparse
 
+import comet_ml
 import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import CometLogger
@@ -79,28 +80,17 @@ def main(
 
     # Setup data module
     if run_benchmark:
-        data_module = BioKGModule(
-            encoder=encoder
-        )
-        data_module.setup(stage="split", embed_dim=embed_dim)
-    else:
-        data_module = PrimeKGModule(
-            encoder=encoder,
-        )
-    
-        data_module.setup(stage="split", embed_dim=embed_dim)
-
-    # Initialize KGE Module
-    model = KGEModule(
-        in_dim=embed_dim,
-        num_relation=8,
-    )
-
-    if run_benchmark:
         assert ckpt_path is not None
 
         model = KGEModule.load_from_checkpoint(ckpt_path)
+        # In PrimeKG, drug - gene relation is one
+        model.select_edge_type_id = 1
+        data_module = BioKGModule(encoder=encoder)
+        data_module.setup(stage="split", embed_dim=embed_dim)
+
     else:
+        data_module = PrimeKGModule(encoder=encoder,)
+        data_module.setup(stage="split", embed_dim=embed_dim)
         model = KGEModule(
             in_dim=embed_dim,
             num_relation=data_module.data.num_edge_types,
@@ -123,9 +113,14 @@ def main(
         with open(os.path.join(ckpt_dir, "node_mapping.json"), "w") as file:
             json.dump(data_module.primekg.mapping_dict, file, indent=4)
     else:
-        ckpt_dir = os.path.dirname(ckpt_path)
+        if run_benchmark:
+            ckpt_dir = "benchmark" + os.path.dirname(ckpt_path)
+            exp_name = "benchmark" + str(os.path.basename(ckpt_dir).split("_")[-1])
+        else:
+            ckpt_dir = os.path.dirname(ckpt_path)
+            exp_name = str(os.path.basename(ckpt_dir).split("_")[-1])
+
         log_dir = ckpt_dir.replace(os.path.basename(train_settings.OUT_DIR), os.path.basename(train_settings.LOG_DIR))
-        exp_name = str(os.path.basename(ckpt_dir).split("_")[-1])
 
 
     checkpoint_callback = ModelCheckpoint(

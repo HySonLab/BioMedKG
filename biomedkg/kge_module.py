@@ -23,7 +23,8 @@ class KGEModule(LightningModule):
                 num_heads: int =kge_settings.KGE_NUM_HEAD,
                 scheduler_type : str = train_settings.SCHEDULER_TYPE,
                 learning_rate: float = train_settings.LEARNING_RATE,
-                warm_up_ratio : float = train_settings.WARM_UP_RATIO
+                warm_up_ratio : float = train_settings.WARM_UP_RATIO,
+                select_edge_type_id : int = None
                  ):
         super().__init__()
         assert encoder_name in ["rgcn", "rgat"], "Only support 'rgcn' and 'rgat'."
@@ -124,6 +125,7 @@ class KGEModule(LightningModule):
         )
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
+        self.select_edge_type_id = select_edge_type_id
     
     def forward(self, x, edge_index, edge_type):
         if self.llm_init_node:
@@ -160,6 +162,8 @@ class KGEModule(LightningModule):
                 x = x.view(x.size(0), -1)
         else:
             x = batch.x
+        if self.select_edge_type_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
 
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
@@ -196,6 +200,9 @@ class KGEModule(LightningModule):
                 x = x.view(x.size(0), -1)
         else:
             x = batch.x
+
+        if self.select_edge_type_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
 
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
@@ -240,6 +247,9 @@ class KGEModule(LightningModule):
         else:
             x = batch.x
 
+        if self.select_edge_type_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
+            
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index = negative_sampling(batch.edge_index)

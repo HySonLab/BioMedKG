@@ -140,7 +140,7 @@ class KGEModule(LightningModule):
             elif self.modality_aggr == "sum":
                 x = torch.sum(x, dim=1)
             else:
-                x = x.view(x.size(0), -1) 
+                x = x.view(x.size(0), -1)
 
         return self.encoder(x, edge_index, edge_type)
     
@@ -203,7 +203,7 @@ class KGEModule(LightningModule):
 
         if self.select_edge_type_id is not None:
             batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
-
+      
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index = negative_sampling(batch.edge_index)
@@ -223,7 +223,7 @@ class KGEModule(LightningModule):
         self.log("val_loss", loss, on_epoch=True, on_step=True, prog_bar=True)
         return loss
 
-    def on_validation_epoch_end(self,):
+    def on_validation_epoch_end(self):
         output = self.valid_metrics.compute()
         self.log_dict(output)
         self.valid_metrics.reset()
@@ -262,7 +262,7 @@ class KGEModule(LightningModule):
 
         self.test_metrics.update(pred, gt.to(torch.int32))
 
-    def on_test_epoch_end(self, batch, batch_idx):
+    def on_test_epoch_end(self):
         output = self.test_metrics.compute()
         self.log_dict(output)
         self.test_metrics.reset()

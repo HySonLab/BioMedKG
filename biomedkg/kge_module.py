@@ -1,29 +1,30 @@
 import torch
 import torch.nn.functional as F
 from lightning import LightningModule
-from torchmetrics import MetricCollection, AUROC, AveragePrecision
+from torchmetrics import MetricCollection, AUROC, AveragePrecision, F1Score
 
 from torch_geometric.nn import GAE
 from torch_geometric.utils import negative_sampling
 from transformers.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
-from biomedkg.modules import RGCN, RGAT, DistMult, TransE
+from biomedkg.modules import RGCN, RGAT, DistMult, TransE, ComplEx
 from biomedkg.modules.fusion import AttentionFusion, ReDAF
-from biomedkg.configs import kge_settings, node_settings
+from biomedkg.configs import kge_settings, node_settings, train_settings, data
 
 class KGEModule(LightningModule):
     def __init__(self,
-                 encoder_name : str,
-                 decoder_name : str,
-                 in_dim : int,
-                 hidden_dim : int,
-                 out_dim : int,
-                 num_hidden_layers : int,
-                 num_relation : int,
-                 num_heads : int,
-                 scheduler_type : str = "cosine",
-                 learning_rate: float = 2e-4,
-                 warm_up_ratio: float = 0.03,
+                encoder_name:str = kge_settings.KGE_ENCODER,
+                decoder_name: str = kge_settings.KGE_DECODER,
+                in_dim: int = 128,
+                hidden_dim: int = kge_settings.KGE_HIDDEN_DIM,
+                out_dim: int = node_settings.KGE_TRAINED_NODE_DIM,
+                num_hidden_layers: int = kge_settings.KGE_NUM_HIDDEN,
+                num_relation: int = 8,
+                num_heads: int =kge_settings.KGE_NUM_HEAD,
+                scheduler_type : str = train_settings.SCHEDULER_TYPE,
+                learning_rate: float = train_settings.LEARNING_RATE,
+                warm_up_ratio : float = train_settings.WARM_UP_RATIO,
+                select_edge_type_id : int = None
                  ):
         super().__init__()
         assert encoder_name in ["rgcn", "rgat"], "Only support 'rgcn' and 'rgat'."
@@ -98,6 +99,11 @@ class KGEModule(LightningModule):
                 num_relations=num_relation,
                 hidden_channels=out_dim,
             )
+        elif decoder_name == "complex":
+            self.decoder = ComplEx(
+                num_relations=num_relation,
+                hidden_channels=out_dim,
+            )
         else:
             raise NotImplemented
 
@@ -114,10 +120,12 @@ class KGEModule(LightningModule):
             [
                 AUROC(task="binary"),
                 AveragePrecision(task="binary"),
+                F1Score(task="binary"),
             ]
         )
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
+        self.select_edge_type_id = select_edge_type_id
     
     def forward(self, x, edge_index, edge_type):
         if self.llm_init_node:
@@ -154,6 +162,8 @@ class KGEModule(LightningModule):
                 x = x.view(x.size(0), -1)
         else:
             x = batch.x
+        if self.select_edge_type_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
 
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
@@ -190,7 +200,10 @@ class KGEModule(LightningModule):
                 x = x.view(x.size(0), -1)
         else:
             x = batch.x
-        
+
+        if self.select_edge_type_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
+      
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index = negative_sampling(batch.edge_index)
@@ -234,6 +247,9 @@ class KGEModule(LightningModule):
         else:
             x = batch.x
 
+        if self.select_edge_type_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
+            
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index = negative_sampling(batch.edge_index)

@@ -86,7 +86,7 @@ class EncodeNodeWithModality:
         for entity_type in self.entity_type:
             
             modality_dict = dict()
-            all_modality = list()
+            all_modality = set()
 
             # Load LLM embeddings by modality and store them in dictionary
             pickle_files = glob.glob(self.embed_path + f"/{entity_type}*.pickle")
@@ -94,8 +94,11 @@ class EncodeNodeWithModality:
                 modality_name = Path(pickle_file).stem.split("_")[1]
                 with open(pickle_file, "rb") as file:
                     data = pickle.load(file=file)
-                    modality_dict[modality_name] = data
-                all_modality.append(modality_name)
+                    if modality_name in modality_dict:
+                        modality_dict[modality_name].update(data)
+                    else:
+                        modality_dict[modality_name] = data
+                all_modality.add(modality_name)
             
             # Ensure 'seq' is always at the second position
             all_modality = sorted(all_modality, key=lambda s: (1, s) if "seq" in s else (0, s))
@@ -110,7 +113,6 @@ class EncodeNodeWithModality:
                 fuse_embed = list()
                 for modality_name in all_modality:
                     embedding = modality_dict[modality_name].get(node_name, None)
-
                     if embedding is not None:
                         fuse_embed.append(torch.tensor(embedding))
                     else:

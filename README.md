@@ -31,10 +31,10 @@
 ## Setup
 
 ### Prepare data
-Create a `data` folder, download enhanced modality csv file from Google Drive, and save it in `data/modalities`
+Create a `data` folder, download an enhanced modality CSV file from Google Drive, and save it in `data/modalities`
 
 ### Installation
-Run the followowing command to build the module and install dependencies.
+Run the following command to build the module and install dependencies.
 ```
 pip install -e .
 ```
@@ -46,7 +46,7 @@ python scripts/get_modality_embedding.py
 ```
 
 ## Train
-You should ```export COMET_API_KEY=<your-comet-api-key>``` to track the training process on Comet dash board, otherwise it will be recorded in `log` folder.
+You should ```export COMET_API_KEY=<your-comet-api-key>``` to track the training process on Comet dashboard, otherwise, it will be recorded in `log` folder.
 
 Run the following scripts with the flag `-h` for more information.
 ### Graph Contrastive Learning
@@ -55,16 +55,30 @@ To train a graph on contrastive learning with intra-node type, for example, with
 python scripts/train_gcl.py --model_name ggd --node_type gene
 ```
 
-### Get node embedding after traning GCL
+### Get node embedding after training GCL
 To obtain the node embedding for each modality after training with GCL, execute the following command to load the checkpoint and extract the embedding:
 ```
 python scripts/get_embedding_from_ckpt.py --model_name ggd --ckpt ./ckpt/gcl/*/*.ckpt
 ```
 
 ### Knowledge Graph Embedding
-Run the following command to execute Link Predition on Knowledge Graph Embedding:
+Run the following command to execute Link Prediction on Knowledge Graph Embedding:
 ```
 python scripts/train_kge.py
+```
+
+## Benchmark on FDI-DPA
+
+### Additional data requirements:
+* Download `dpi_fda.csv` to `data/benchmarks/`
+* Download `dpi_drug_feature.csv` to `data/modalities/`
+* Download `dpi_gene_feature.csv` to `data/modalities/`
+
+
+### Benchmark 
+Run the following command to execute Link Prediction on DPI-FDA dataset:
+```
+python scripts/train_kge.py --gcl_embed_path ./data/gcl_embed/*/ --ckpt_path ./ckpt/kge/*/*.ckpt --run_benchmark
 ```
 
 ## Contributors:

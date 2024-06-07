@@ -1,6 +1,8 @@
 import os
 import torch
 import pandas as pd
+import pickle 
+import numpy as np
 from tqdm.auto import tqdm
 from torch_geometric.data import HeteroData
 
@@ -14,7 +16,7 @@ class TripletBase:
             encoder : dict = None,
             ):
         self.df = df
-        self.list_nodes = self.df['x_type'].unique()
+        self.list_nodes = np.unique(np.concatenate([self.df['x_type'].unique(), self.df['y_type'].unique()]))
         self.list_edges = self.df['relation'].unique()
         self.encoder = encoder
         self.embedding_dim = embed_dim
@@ -34,8 +36,10 @@ class TripletBase:
         node_id = 0
 
         for node_type in tqdm(self.list_nodes, desc="Load node"):
-            node_df = self.df[self.df['x_type'] == node_type]
-            lst_node_name = set(node_df['x_name'].values)
+            node_df_x = self.df[self.df['x_type'] == node_type]
+            node_df_y = self.df[self.df['y_type'] == node_type]
+            lst_node_name = set(node_df_x['x_name'].values) | set(node_df_y['y_name'].values)
+
 
             node_mapping = dict()
             lst_node_name = sorted(lst_node_name)
@@ -47,7 +51,6 @@ class TripletBase:
             node_mapping = {node_name: index for index, node_name in enumerate(lst_node_name)}
 
             self.modality_mapping[node_type] = node_mapping
-            
             if self.encoder is not None:
                 embedding = self.encoder(lst_node_name)
             else:
@@ -80,6 +83,7 @@ class TripletBase:
             relation = clean_name(relation)
 
             self.data[head, relation, tail].edge_index = edge_index
+
 
 
 class PrimeKG(TripletBase):
@@ -123,5 +127,14 @@ class BioKG(TripletBase):
             encoder : dict = None
             ):
         # Prepare pd.DataFrame with 5 columns ['x_type', 'x_name', 'relation', 'y_type', 'y_name']
-        df = pd.read_csv(data_dir, delimiter="\t")
+        df = pd.read_csv(data_dir,)
+
         super().__init__(df=df, embed_dim=embed_dim, encoder=encoder)
+
+if __name__ == "__main__":
+    biokg = BioKG("data/dpi_fda_c.csv", 768)
+
+    print(biokg.df.head())
+    biokg.get_data()
+
+    print("Test successful!")

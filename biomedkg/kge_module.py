@@ -266,6 +266,7 @@ class KGEModule(LightningModule):
         output = self.test_metrics.compute()
         self.log_dict(output)
         self.test_metrics.reset()
+        return output
     
     def configure_optimizers(self,):
         optimizer = torch.optim.Adam(self.model.parameters(), lr = self.lr)

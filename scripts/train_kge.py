@@ -190,11 +190,6 @@ def main(
     # Test
     elif task == "test":
         assert ckpt_path is not None, "Please specify checkpoint path."
-        trainer_args.update(
-            {
-                "fast_dev_run": True,
-            }
-        )
         trainer = Trainer(**trainer_args)
         trainer.test(
              model=model,

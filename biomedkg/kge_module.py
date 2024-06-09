@@ -25,7 +25,8 @@ class KGEModule(LightningModule):
                 scheduler_type : str = train_settings.SCHEDULER_TYPE,
                 learning_rate: float = train_settings.LEARNING_RATE,
                 warm_up_ratio : float = train_settings.WARM_UP_RATIO,
-                select_edge_type_id : int = None
+                select_edge_type_id : int = None,
+                neg_ratio: int = self.neg_ratio,
                  ):
         super().__init__()
         assert encoder_name in ["rgcn", "rgat"], "Only support 'rgcn' and 'rgat'."
@@ -127,6 +128,7 @@ class KGEModule(LightningModule):
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
         self.select_edge_type_id = select_edge_type_id
+        self.neg_ratio = neg_ratio
     
     def forward(self, x, edge_index, edge_type):
         if self.llm_init_node:
@@ -168,10 +170,13 @@ class KGEModule(LightningModule):
 
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
-        neg_edge_index = negative_sampling(batch.edge_index)
+        neg_edge_index = negative_sampling(batch.edge_index, num_neg_samples=self.neg_ratio*batch.edge_index.size(-1))
+        neg_edge_type = batch.edge_type.repeat(self.neg_ratio)
+        neg_edge_indices = torch.randperm(neg_edge_type.size(0))
+        neg_edge_type = neg_edge_type[neg_edge_indices]
 
         pos_pred = self.model.decode(z, batch.edge_index, batch.edge_type)
-        neg_pred = self.model.decode(z, neg_edge_index, batch.edge_type)
+        neg_pred = self.model.decode(z, neg_edge_index, neg_edge_type)
         pred = torch.cat([pos_pred, neg_pred])
 
         gt = torch.cat([torch.ones_like(pos_pred), torch.zeros_like(neg_pred)])
@@ -207,10 +212,13 @@ class KGEModule(LightningModule):
       
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
-        neg_edge_index = negative_sampling(batch.edge_index)
+        neg_edge_index = negative_sampling(batch.edge_index, num_neg_samples=self.neg_ratio*batch.edge_index.size(-1))
+        neg_edge_type = batch.edge_type.repeat(self.neg_ratio)
+        neg_edge_indices = torch.randperm(neg_edge_type.size(0))
+        neg_edge_type = neg_edge_type[neg_edge_indices]
 
         pos_pred = self.model.decode(z, batch.edge_index, batch.edge_type)
-        neg_pred = self.model.decode(z, neg_edge_index, batch.edge_type)
+        neg_pred = self.model.decode(z, neg_edge_index, neg_edge_type)
         pred = torch.cat([pos_pred, neg_pred])
 
         gt = torch.cat([torch.ones_like(pos_pred), torch.zeros_like(neg_pred)])
@@ -253,10 +261,13 @@ class KGEModule(LightningModule):
             
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
-        neg_edge_index = negative_sampling(batch.edge_index)
+        neg_edge_index = negative_sampling(batch.edge_index, num_neg_samples=self.neg_ratio*batch.edge_index.size(-1))
+        neg_edge_type = batch.edge_type.repeat(self.neg_ratio)
+        neg_edge_indices = torch.randperm(neg_edge_type.size(0))
+        neg_edge_type = neg_edge_type[neg_edge_indices]
 
         pos_pred = self.model.decode(z, batch.edge_index, batch.edge_type)
-        neg_pred = self.model.decode(z, neg_edge_index, batch.edge_type)
+        neg_pred = self.model.decode(z, neg_edge_index, neg_edge_type)
         pred = torch.cat([pos_pred, neg_pred])
 
         gt = torch.cat([torch.ones_like(pos_pred), torch.zeros_like(neg_pred)])

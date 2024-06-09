@@ -26,7 +26,7 @@ class KGEModule(LightningModule):
                 learning_rate: float = train_settings.LEARNING_RATE,
                 warm_up_ratio : float = train_settings.WARM_UP_RATIO,
                 select_edge_type_id : int = None,
-                neg_ratio: int = self.neg_ratio,
+                neg_ratio: int = 10,
                  ):
         super().__init__()
         assert encoder_name in ["rgcn", "rgat"], "Only support 'rgcn' and 'rgat'."

@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from lightning import LightningModule
 from torchmetrics import MetricCollection, AUROC, AveragePrecision, F1Score
+from torchmetrics.wrappers import BootStrapper
 
 from torch_geometric.nn import GAE
 from torch_geometric.utils import negative_sampling
@@ -9,7 +10,7 @@ from transformers.optimization import get_cosine_schedule_with_warmup, get_linea
 
 from biomedkg.modules import RGCN, RGAT, DistMult, TransE, ComplEx
 from biomedkg.modules.fusion import AttentionFusion, ReDAF
-from biomedkg.configs import kge_settings, node_settings, train_settings, data
+from biomedkg.configs import kge_settings, node_settings, train_settings
 
 class KGEModule(LightningModule):
     def __init__(self,
@@ -117,11 +118,11 @@ class KGEModule(LightningModule):
         self.warm_up_ratio = warm_up_ratio
 
         metrics = MetricCollection(
-            [
-                AUROC(task="binary"),
-                AveragePrecision(task="binary"),
-                F1Score(task="binary"),
-            ]
+            {
+                "AUROC": BootStrapper(AUROC(task="binary"),),
+                "AveragePrecision": BootStrapper(AveragePrecision(task="binary")),
+                "F1": BootStrapper(F1Score(task="binary")),
+            }
         )
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")

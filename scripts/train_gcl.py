@@ -76,83 +76,30 @@ def main(
 
     data_module.setup(stage="split", embed_dim=node_settings.PRETRAINED_NODE_DIM)
 
+    gcl_kwargs = {
+        "in_dim": node_settings.PRETRAINED_NODE_DIM,
+        "hidden_dim": gcl_settings.GCL_HIDDEN_DIM,
+        "out_dim": node_settings.GCL_TRAINED_NODE_DIM,
+        "num_hidden_layers": gcl_settings.GCL_NUM_HIDDEN,
+        "scheduler_type": train_settings.SCHEDULER_TYPE,
+        "learning_rate": train_settings.LEARNING_RATE,
+        "warm_up_ratio": train_settings.WARM_UP_RATIO,
+    }
+
     # Initialize GCL module
     if model_name == "dgi":
-        model = DGIModule(
-            in_dim=node_settings.PRETRAINED_NODE_DIM,
-            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
-            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            scheduler_type=train_settings.SCHEDULER_TYPE,
-            learning_rate=train_settings.LEARNING_RATE,
-            warm_up_ratio=train_settings.WARM_UP_RATIO,
-        )
+        model = DGIModule(**gcl_kwargs)
     elif model_name == "grace":
-        model = GRACEModule(
-            in_dim=node_settings.PRETRAINED_NODE_DIM,
-            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
-            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            scheduler_type=train_settings.SCHEDULER_TYPE,
-            learning_rate=train_settings.LEARNING_RATE,
-            warm_up_ratio=train_settings.WARM_UP_RATIO,
-        )
+        model = GRACEModule(**gcl_kwargs)
     elif model_name == "ggd":
-        model = GGDModule(
-            in_dim=node_settings.PRETRAINED_NODE_DIM,
-            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
-            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            scheduler_type=train_settings.SCHEDULER_TYPE,
-            learning_rate=train_settings.LEARNING_RATE,
-            warm_up_ratio=train_settings.WARM_UP_RATIO,
-        )
+        model = GGDModule(**gcl_kwargs)
     else:
         raise NotImplementedError
-    
-    # Setup logging/ckpt path
-    if ckpt_path is None:
-        exp_name = str(int(time.time()))
-        ckpt_dir = os.path.join(train_settings.OUT_DIR, "gcl", node_type, f"{model_name}_{node_type}_{node_settings.MODALITY_TRANSFORM_METHOD}_{node_settings.MODALITY_MERGING_METHOD}_{exp_name}")
-        log_dir = os.path.join(train_settings.LOG_DIR, "gcl", node_type, f"{model_name}_{node_type}_{node_settings.MODALITY_TRANSFORM_METHOD}_{node_settings.MODALITY_MERGING_METHOD}_{exp_name}")
-
-        if not os.path.exists(ckpt_dir):
-            os.makedirs(ckpt_dir)
-
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        with open(os.path.join(ckpt_dir, "node_mapping.json"), "w") as file:
-            json.dump(data_module.primekg.mapping_dict, file, indent=4)
-    else:
-        ckpt_dir = os.path.dirname(ckpt_path)
-        log_dir = ckpt_dir.replace(os.path.basename(train_settings.OUT_DIR), os.path.basename(train_settings.LOG_DIR))
-        exp_name = str(os.path.basename(ckpt_dir).split("_")[-1])
-
-    # Setup callback
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=ckpt_dir, 
-        monitor="val_loss", 
-        save_top_k=3, 
-        mode="min",
-        save_last=True,
-        )
-    
-    early_stopping = EarlyStopping(monitor="val_loss", mode="min")
-
-    logger = CometLogger(
-        api_key=find_comet_api_key(),
-        project_name=f"BioMedKG-GCL-{node_type}",
-        save_dir=log_dir,
-        experiment_name=exp_name,
-    )
 
     # Prepare trainer args
     trainer_args = {
         "accelerator": "auto", 
         "log_every_n_steps": 10,
-        "default_root_dir": ckpt_dir,
-        "logger": logger, 
         "deterministic": True, 
     }
 
@@ -174,6 +121,37 @@ def main(
 
     # Train
     if task == "train":
+        exp_name = str(int(time.time()))
+        ckpt_dir = os.path.join(train_settings.OUT_DIR, "gcl", node_type, f"{model_name}_{node_type}_{node_settings.MODALITY_TRANSFORM_METHOD}_{node_settings.MODALITY_MERGING_METHOD}_{exp_name}")
+        log_dir = os.path.join(train_settings.LOG_DIR, "gcl", node_type, f"{model_name}_{node_type}_{node_settings.MODALITY_TRANSFORM_METHOD}_{node_settings.MODALITY_MERGING_METHOD}_{exp_name}")
+
+        if not os.path.exists(ckpt_dir):
+            os.makedirs(ckpt_dir)
+
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        with open(os.path.join(ckpt_dir, "node_mapping.json"), "w") as file:
+            json.dump(data_module.primekg.mapping_dict, file, indent=4)
+
+        # Setup callback
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=ckpt_dir, 
+            monitor="val_loss", 
+            save_top_k=3, 
+            mode="min",
+            save_last=True,
+            )
+        
+        early_stopping = EarlyStopping(monitor="val_loss", mode="min")
+
+        logger = CometLogger(
+            api_key=find_comet_api_key(),
+            project_name=f"BioMedKG-GCL-{node_type}",
+            save_dir=log_dir,
+            experiment_name=exp_name,
+        )
+
         trainer_args.update(
             {
                 "max_epochs": train_settings.EPOCHS,
@@ -181,6 +159,8 @@ def main(
                 "enable_checkpointing": True,     
                 "gradient_clip_val": 1.0,
                 "callbacks": [checkpoint_callback, early_stopping],
+                "default_root_dir": ckpt_dir,
+                "logger": logger, 
             }
         )
 

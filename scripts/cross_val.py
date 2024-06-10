@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import pandas as pd 
+from scipy import stats 
 from sklearn.model_selection import KFold
 from lightning.pytorch import Trainer, seed_everything
 from torch_geometric.loader import LinkNeighborLoader
@@ -88,7 +89,8 @@ def summarize(result: list[dict]):
     for col in result_df:
         metrics_mean = np.mean(result_df[col].values)
         metrics_std = np.std(result_df[col].values)
-        print(f"{col}: {round(metrics_mean, 4)} ± {round(metrics_std, 4)}")
+        t_stat, p_value = stats.ttest_1samp(result_df[col].values, 0)
+        print(f"{col}: {round(metrics_mean, 4)} ± {round(metrics_std, 4)}, p-value: {p_value:.4f}")
     print("\n---------------------------\n")
 
 

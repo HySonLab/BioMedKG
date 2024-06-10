@@ -3,7 +3,6 @@ import time
 import json
 import argparse
 
-
 import comet_ml
 import torch
 from lightning.pytorch import Trainer, seed_everything
@@ -124,29 +123,10 @@ def main(
 
         log_dir = ckpt_dir.replace(os.path.basename(train_settings.OUT_DIR), os.path.basename(train_settings.LOG_DIR))
 
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=ckpt_dir, 
-        monitor="val_loss", 
-        save_top_k=3, 
-        mode="min",
-        save_last=True,
-        )
-    
-    early_stopping = EarlyStopping(monitor="val_BinaryAUROC", mode="max", min_delta=0.001, patience=1)
-
-    logger = CometLogger(
-        api_key=find_comet_api_key(),
-        project_name="BioMedKG-KGE",
-        save_dir=log_dir,
-        experiment_name=exp_name,
-    )
-
     # Prepare trainer args
     trainer_args = {
         "accelerator": "auto", 
         "log_every_n_steps": 10,
-        "default_root_dir": ckpt_dir,
-        "logger": logger, 
         "deterministic": True, 
     }
 
@@ -168,6 +148,23 @@ def main(
 
     # Train
     if task == "train":
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=ckpt_dir, 
+            monitor="val_loss", 
+            save_top_k=3, 
+            mode="min",
+            save_last=True,
+            )
+        
+        early_stopping = EarlyStopping(monitor="val_BinaryAUROC", mode="max", min_delta=0.001, patience=1)
+
+        logger = CometLogger(
+            api_key=find_comet_api_key(),
+            project_name="BioMedKG-KGE",
+            save_dir=log_dir,
+            experiment_name=exp_name,
+        )
+
         trainer_args.update(
             {
                 "max_epochs": train_settings.EPOCHS,
@@ -175,6 +172,8 @@ def main(
                 "enable_checkpointing": True,     
                 "gradient_clip_val": 1.0,
                 "callbacks": [checkpoint_callback, early_stopping],
+                "default_root_dir": ckpt_dir,
+                "logger": logger, 
             }
         )
 
@@ -190,11 +189,6 @@ def main(
     # Test
     elif task == "test":
         assert ckpt_path is not None, "Please specify checkpoint path."
-        trainer_args.update(
-            {
-                "fast_dev_run": True,
-            }
-        )
         trainer = Trainer(**trainer_args)
         trainer.test(
              model=model,

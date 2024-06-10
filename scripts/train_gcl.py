@@ -39,6 +39,14 @@ def parse_opt():
              action='store', 
              required=True,
              choices=['gene', 'drug', 'disease'], 
+             help="Train contrastive learning on which node type")   
+
+        parser.add_argument(
+             '--transform_method', 
+             type=str, 
+             action='store', 
+             required=True,
+             choices=['attention', 'redaf', 'None'], 
              help="Train contrastive learning on which node type")        
         
         parser.add_argument(
@@ -55,7 +63,9 @@ def main(
           task:str, 
           model_name:str,
           node_type:str, 
-          ckpt_path:str = None):
+          transform_method: str,
+          ckpt_path:str = None,
+          ):
     print("\033[95m" + f"Graph Contrastive Learning on {node_type}" + "\033[0m")
 
     seed_everything(train_settings.SEED)
@@ -76,37 +86,24 @@ def main(
 
     data_module.setup(stage="split", embed_dim=node_settings.PRETRAINED_NODE_DIM)
 
+    gcl_args = {
+        "in_dim": node_settings.PRETRAINED_NODE_DIM,
+        "hidden_dim": gcl_settings.GCL_HIDDEN_DIM,
+        "out_dim": node_settings.GCL_TRAINED_NODE_DIM,
+        "num_hidden_layers": gcl_settings.GCL_NUM_HIDDEN,
+        "scheduler_type": train_settings.SCHEDULER_TYPE,
+        "learning_rate": train_settings.LEARNING_RATE,
+        "warm_up_ratio": train_settings.WARM_UP_RATIO,
+        "modality_transform_method": transform_method,
+    }
+
     # Initialize GCL module
     if model_name == "dgi":
-        model = DGIModule(
-            in_dim=node_settings.PRETRAINED_NODE_DIM,
-            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
-            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            scheduler_type=train_settings.SCHEDULER_TYPE,
-            learning_rate=train_settings.LEARNING_RATE,
-            warm_up_ratio=train_settings.WARM_UP_RATIO,
-        )
+        model = DGIModule(**gcl_args)
     elif model_name == "grace":
-        model = GRACEModule(
-            in_dim=node_settings.PRETRAINED_NODE_DIM,
-            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
-            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            scheduler_type=train_settings.SCHEDULER_TYPE,
-            learning_rate=train_settings.LEARNING_RATE,
-            warm_up_ratio=train_settings.WARM_UP_RATIO,
-        )
+        model = GRACEModule(**gcl_args)
     elif model_name == "ggd":
-        model = GGDModule(
-            in_dim=node_settings.PRETRAINED_NODE_DIM,
-            hidden_dim=gcl_settings.GCL_HIDDEN_DIM,
-            out_dim=node_settings.GCL_TRAINED_NODE_DIM,
-            num_hidden_layers=gcl_settings.GCL_NUM_HIDDEN,
-            scheduler_type=train_settings.SCHEDULER_TYPE,
-            learning_rate=train_settings.LEARNING_RATE,
-            warm_up_ratio=train_settings.WARM_UP_RATIO,
-        )
+        model = GGDModule(**gcl_args)
     else:
         raise NotImplementedError
     

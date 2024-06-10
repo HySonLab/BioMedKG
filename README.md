@@ -78,7 +78,7 @@ python scripts/train_kge.py
 ### Benchmark 
 Run the following command to execute Link Prediction on DPI-FDA dataset:
 ```
-python scripts/train_kge.py --gcl_embed_path ./data/gcl_embed/*/ --ckpt_path ./ckpt/kge/*/*.ckpt --run_benchmark
+python scripts/cross_val.py --ckpt_path ckpt/kge/*/*.ckpt --gcl_embed_path data/gcl_embed/* --max_epoch 20 --neg_ratio 10
 ```
 
 ## Contributors:

@@ -38,6 +38,12 @@ def parse_opt():
             default=42,
             help="Set seed")
     
+    parser.add_argument(
+            '--neg_ratio',
+            type=int,
+            default=10,
+            help="Set seed")
+    
     opt = parser.parse_args()
     return opt
 
@@ -62,7 +68,6 @@ def run_fold(model, train_graph, test_graph, max_epoch):
         "accelerator": "auto", 
         "log_every_n_steps": 2,
         "deterministic": True, 
-        # "max_epochs": train_settings.EPOCHS,
         "max_epochs": max_epoch,
         "gradient_clip_val": 1.0,
     }
@@ -87,7 +92,7 @@ def summarize(result: list[dict]):
     print("\n---------------------------\n")
 
 
-def k_fold(ckpt_path:str, gcl_embed_path: str, max_epoch:int, seed: int):
+def k_fold(ckpt_path:str, gcl_embed_path: str, max_epoch:int, seed: int, neg_ratio: int):
     df = pd.read_csv(data_settings.BENCHMARK_DIR)
     kfold = KFold(n_splits=5, shuffle=True, random_state=seed)
     kfold.get_n_splits(df)
@@ -108,6 +113,7 @@ def k_fold(ckpt_path:str, gcl_embed_path: str, max_epoch:int, seed: int):
         test_graph = TripletBase(df=test_data, embed_dim=embed_dim, encoder=None).get_data()
 
         model = KGEModule.load_from_checkpoint(ckpt_path)
+        model.neg_ratio = neg_ratio
         model.select_edge_type_id = 1
 
         fold_result = run_fold(

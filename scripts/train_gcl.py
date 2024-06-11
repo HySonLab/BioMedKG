@@ -39,6 +39,14 @@ def parse_opt():
              action='store', 
              required=True,
              choices=['gene', 'drug', 'disease'], 
+             help="Train contrastive learning on which node type")   
+
+        parser.add_argument(
+             '--transform_method', 
+             type=str, 
+             action='store', 
+             required=True,
+             choices=['attention', 'redaf', 'None'], 
              help="Train contrastive learning on which node type")        
         
         parser.add_argument(
@@ -55,7 +63,9 @@ def main(
           task:str, 
           model_name:str,
           node_type:str, 
-          ckpt_path:str = None):
+          transform_method: str,
+          ckpt_path:str = None,
+          ):
     print("\033[95m" + f"Graph Contrastive Learning on {node_type}" + "\033[0m")
 
     seed_everything(train_settings.SEED)
@@ -84,6 +94,7 @@ def main(
         "scheduler_type": train_settings.SCHEDULER_TYPE,
         "learning_rate": train_settings.LEARNING_RATE,
         "warm_up_ratio": train_settings.WARM_UP_RATIO,
+        "modality_transform_method": transform_method,
     }
 
     # Initialize GCL module

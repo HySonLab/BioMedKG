@@ -10,71 +10,81 @@ from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
 from biomedkg.kge_module import KGEModule
-from biomedkg.modules.node import EncodeNode, EncodeNodeWithModality
+from biomedkg.factory import NodeEncoderFactory
 from biomedkg.data_module import PrimeKGModule, BioKGModule
 from biomedkg.modules.utils import find_comet_api_key
 from biomedkg.configs import train_settings, kge_settings, data_settings, node_settings
 
 def parse_opt():
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-             '--task', 
-             type=str, 
-             action='store', 
-             choices=['train', 'test'], 
-             default='train', 
-             help="Do training or testing task")
-        
-        parser.add_argument(
-             '--ckpt_path', 
-             type=str, 
-             default=None,
-             required=False,
-             help="Path to checkpoint")
-        
-        parser.add_argument(
-             '--gcl_embed_path',
-             type=str,
-             default=None,
-             required=False,
-             help="Path to your GCL embedding")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+            '--task', 
+            type=str, 
+            action='store', 
+            choices=['train', 'test'], 
+            default='train', 
+            help="Do training or testing task")
+    
+    parser.add_argument(
+            '--gcl_embed_path',
+            type=str,
+            default=None,
+            required=False,
+            help="Path to your GCL embedding")
 
-        parser.add_argument(
-             '--run_benchmark',
-             action="store_true",
-             help="Path to your GCL embedding")
-        
-        opt = parser.parse_args()
-        return opt
+    parser.add_argument(
+            '--run_benchmark',
+            action="store_true",
+            help="Run the benchmark")
+    
+    parser.add_argument(
+            '--node_init_method',
+            type=str, 
+            action='store', 
+            required=False,
+            default="gcl",
+            choices=["random", "gcl", "llm"],
+            help="Select node init method")
+    
+    parser.add_argument(
+            '--modality_transform_method', 
+            type=str, 
+            action='store', 
+            required=False,
+            default='None',
+            choices=['attention', 'redaf', 'None'], 
+            help="Modality transform methods")
+    
+    parser.add_argument(
+            '--ckpt_path', 
+            type=str, 
+            default=None,
+            required=False,
+            help="Path to checkpoint")
+    
+    opt = parser.parse_args()
+    return opt
 
 def main(
         task:str, 
-        ckpt_path: str = None, 
-        gcl_embed_path: str = None,
-        run_benchmark: bool = False,
+        ckpt_path: str, 
+        gcl_embed_path: str,
+        run_benchmark: bool,
+        node_init_method: str,
+        modality_transform_method: str
         ):
     seed_everything(train_settings.SEED)
 
-    embed_dim = None
-    node_init_method = kge_settings.KGE_NODE_INIT_METHOD
+    if node_init_method in ["random", "gcl"]:
+        modality_transform_method = None
+    
+    if gcl_embed_path is not None:
+        node_init_method = "gcl"
 
-    if node_init_method == "gcl":
-        assert gcl_embed_path is not None
-        encoder = EncodeNode(
-            embed_path=gcl_embed_path
-            )
-        embed_dim = node_settings.GCL_TRAINED_NODE_DIM
-    elif node_init_method == "llm":
-        encoder = EncodeNodeWithModality(
-            entity_type=list(data_settings.NODES_LST), 
-            embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
-            )
-        embed_dim = node_settings.PRETRAINED_NODE_DIM
-    elif node_init_method == "random":
-        encoder = None
-        embed_dim = node_settings.GCL_TRAINED_NODE_DIM
-    else:
-        raise NotImplementedError
+    node_encoder, embed_dim = NodeEncoderFactory.create_encoder(
+        node_init_method=node_init_method,
+        gcl_embed_path=gcl_embed_path,
+    )
 
     # Setup data module
     if run_benchmark:
@@ -83,40 +93,41 @@ def main(
         model = KGEModule.load_from_checkpoint(ckpt_path)
         # In PrimeKG, drug - gene relation is one
         model.select_edge_type_id = 1
-        data_module = BioKGModule(encoder=encoder)
+        data_module = BioKGModule(encoder=node_encoder)
         data_module.setup(stage="split", embed_dim=embed_dim)
 
     else:
-        data_module = PrimeKGModule(encoder=encoder,)
+        data_module = PrimeKGModule(encoder=node_encoder)
         data_module.setup(stage="split", embed_dim=embed_dim)
         model = KGEModule(
             in_dim=embed_dim,
             num_relation=data_module.data.num_edge_types,
+            node_init_method=node_init_method,
+            modality_transform_method=modality_transform_method
         )
 
     # Setup logging/ckpt path
     if ckpt_path is None:
-        exp_name = str(int(time.time()))
+        log_id = str(int(time.time()))
         if gcl_embed_path is not None:
             model_name = gcl_embed_path.split('/')[-1]
-            ckpt_dir = os.path.join(train_settings.OUT_DIR, "kge", f"{node_init_method}_{model_name}_{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
-            log_dir = os.path.join(train_settings.LOG_DIR, "kge", f"{node_init_method}_{model_name}_{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
+            exp_name = f"{node_init_method}_{model_name}_{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{log_id}"
+            ckpt_dir = os.path.join(train_settings.OUT_DIR, "kge", exp_name)
+            log_dir = os.path.join(train_settings.LOG_DIR, "kge", exp_name)
         else:   
-            ckpt_dir = os.path.join(train_settings.OUT_DIR, "kge", f"{node_init_method}_{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
-            log_dir = os.path.join(train_settings.LOG_DIR, "kge", f"{node_init_method}_{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{exp_name}")
+            exp_name = f"{node_init_method}_{kge_settings.KGE_ENCODER}_{kge_settings.KGE_DECODER}_{log_id}"
+            ckpt_dir = os.path.join(train_settings.OUT_DIR, "kge", exp_name)
+            log_dir = os.path.join(train_settings.LOG_DIR, "kge", exp_name)
 
         if not os.path.exists(ckpt_dir):
             os.makedirs(ckpt_dir)
         
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
-
-        with open(os.path.join(ckpt_dir, "node_mapping.json"), "w") as file:
-            json.dump(data_module.primekg.mapping_dict, file, indent=4)
     else:
         if run_benchmark:
-            ckpt_dir = "benchmark" + os.path.dirname(ckpt_path)
-            exp_name = "benchmark" + str(os.path.basename(ckpt_dir).split("_")[-1])
+            ckpt_dir = os.path.dirname(ckpt_path) + "_benchmark"
+            exp_name = "benchmark" + str(os.path.basename(ckpt_dir))
         else:
             ckpt_dir = os.path.dirname(ckpt_path)
             exp_name = str(os.path.basename(ckpt_dir).split("_")[-1])
@@ -130,21 +141,12 @@ def main(
         "deterministic": True, 
     }
 
-    # Setup multiple GPUs training
-    if isinstance(train_settings.DEVICES, list) and len(train_settings.DEVICES) > 1:
+    if torch.cuda.device_count() > 1:
         trainer_args.update(
             {
                 "devices": train_settings.DEVICES,
-                "strategy": "ddp"
             }
         )
-    else:
-        if torch.cuda.device_count() > 1:
-            trainer_args.update(
-                {
-                    "devices": train_settings.DEVICES,
-                }
-            )
 
     # Train
     if task == "train":

@@ -9,7 +9,7 @@ from transformers.optimization import get_cosine_schedule_with_warmup, get_linea
 from biomedkg.modules.gcl import DGI, GRACE, GGD
 from biomedkg.modules import GCNEncoder
 from biomedkg.configs import node_settings
-from biomedkg.modality import ModalityFuserFactory
+from biomedkg.factory import ModalityFuserFactory
 
 
 class BaseGCL(LightningModule):
@@ -23,7 +23,6 @@ class BaseGCL(LightningModule):
                  modality_transform_method: str = node_settings.MODALITY_TRANSFORM_METHOD,
                  ):
         super().__init__()
-        assert scheduler_type in ["linear", "cosine"], "Only support 'cosine' and 'linear'"
 
         self.save_hyperparameters()
 

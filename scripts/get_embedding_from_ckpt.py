@@ -7,9 +7,9 @@ import argparse
 from pathlib import Path
 from tqdm.auto import tqdm
 from biomedkg import gcl_module, kge_module
+from biomedkg.factory import NodeEncoderFactory
 from biomedkg.data_module import PrimeKGModule, BioKGModule
-from biomedkg.modules.node import EncodeNodeWithModality, EncodeNode
-from biomedkg.configs import data_settings, train_settings, node_settings
+from biomedkg.configs import data_settings, train_settings
 from biomedkg.modules.utils import find_device
 from lightning import seed_everything
 
@@ -32,13 +32,22 @@ def parse_opt():
         choices=["primekg", "biokg"],
         help="Choose either primekg or biokg(both biokg and dpi_fda)"
     )
+
+    parser.add_argument(
+        '--gcl_embed_path',
+        type=str,
+        default=None,
+        required=False,
+        help="Path to your GCL embedding"
+    )
     opt = parser.parse_args()
     return opt
 
 
 def main(
         ckpt:str,
-        data:str
+        data:str,
+        gcl_embed_path: str,
 ):
     assert os.path.exists(ckpt)
 
@@ -67,65 +76,45 @@ def main(
             raise NotImplementedError
 
         node_type = dir_name.split("_")[1]
+        process_node = ['gene/protein'] if node_type == "gene" else [node_type]
 
-        if node_type == "gene":
-            process_node = ['gene/protein']
-        else:
-            process_node = [node_type]
+        node_encoder, embed_dim = NodeEncoderFactory.create_encoder(
+            node_init_method="llm",
+            entity_type=node_type,
+        )
 
         if data == "primekg":
             data_module = PrimeKGModule(
                 process_node_lst=process_node,
-                encoder=EncodeNodeWithModality(
-                    entity_type=node_type,
-                    embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR),"embed")
-                )
+                encoder=node_encoder,
             )
         elif data == "biokg":
             data_module = BioKGModule(
-                encoder=EncodeNodeWithModality(
-                    entity_type=node_type,
-                    embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR),"embed")
-                )
+                encoder=node_encoder,
             )
         else:
             raise NotImplementedError
 
-        data_module.setup(stage="split", embed_dim=node_settings.PRETRAINED_NODE_DIM)
+        data_module.setup(stage="split", embed_dim=embed_dim)
         mapping_dict = data_module.primekg.mapping_dict if data == "primekg" else data_module.biokg.mapping_dict
         
     else:
         model = kge_module.KGEModule.load_from_checkpoint(ckpt)
         # Decide node intialize method
         node_init_method = model.hparams.node_init_method
-
-        embed_dim = None
-
-        if node_init_method == "gcl":
-            encoder = EncodeNode(
-                embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), f"gcl_embed/{data}_{model_name}_{modality_transform}")
-                )
-            embed_dim = node_settings.GCL_TRAINED_NODE_DIM
-        elif node_init_method == "llm":
-            encoder = EncodeNodeWithModality(
-                entity_type=list(data_settings.NODES_LST),
-                embed_path=os.path.join(os.path.dirname(data_settings.DATA_DIR), "embed"),
-                )
-            embed_dim = node_settings.PRETRAINED_NODE_DIM
-        elif node_init_method == "random":
-            encoder = None
-            embed_dim = node_settings.GCL_TRAINED_NODE_DIM
-        else:
-            raise NotImplementedError
+        node_encoder, embed_dim = NodeEncoderFactory.create_encoder(
+            node_init_method=node_init_method,
+            gcl_embed_path=gcl_embed_path,
+        )
 
         # Setup data module
         if data == "primekg":
             data_module = PrimeKGModule(
-                encoder=encoder,
+                encoder=node_encoder,
             )    
         elif data == "biokg":
             data_module = BioKGModule(
-                encoder=encoder
+                encoder=node_encoder,
             )
         else:
             raise NotImplementedError

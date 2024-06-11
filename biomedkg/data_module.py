@@ -63,8 +63,6 @@ class PrimeKGModule(LightningDataModule):
 
     def train_dataloader(self, loader_type: str = "neighbor"):
         
-        assert loader_type in ["neighbor", "graph_saint"]
-
         if loader_type == "neighbor":
             return NeighborLoader(
                 data=self.train_data,
@@ -84,8 +82,6 @@ class PrimeKGModule(LightningDataModule):
 
     def val_dataloader(self, loader_type: str):
 
-        assert loader_type in ["neighbor", "graph_saint"]
-
         if loader_type == "neighbor":
             return NeighborLoader(
                 data=self.val_data,
@@ -103,8 +99,6 @@ class PrimeKGModule(LightningDataModule):
             )
 
     def test_dataloader(self, loader_type: str):
-
-        assert loader_type in ["neighbor", "graph_saint"]
 
         if loader_type == "neighbor":
             return NeighborLoader(
@@ -147,7 +141,6 @@ class BioKGModule(LightningDataModule):
         )
 
         self.data = self.biokg.get_data()
-        self.data = T.ToUndirected()(self.data)
 
         if stage == "split":
             self.train_data, self.val_data, self.test_data = T.RandomLinkSplit(
@@ -174,8 +167,6 @@ class BioKGModule(LightningDataModule):
 
     def train_dataloader(self, loader_type: str = "neighbor"):
         
-        assert loader_type in ["neighbor", "graph_saint"], "Only supports neighbor and graph-saint loaders"
-
         if loader_type == "neighbor":
             return NeighborLoader(
                 data=self.train_data,
@@ -195,8 +186,6 @@ class BioKGModule(LightningDataModule):
 
     def val_dataloader(self, loader_type: str):
 
-        assert loader_type in ["neighbor", "graph_saint"], "Only supports neighbor and graph-saint loaders"
-
         if loader_type == "neighbor":
             return NeighborLoader(
                 data=self.val_data,
@@ -214,8 +203,6 @@ class BioKGModule(LightningDataModule):
             )
 
     def test_dataloader(self, loader_type: str):
-
-        assert loader_type in ["neighbor", "graph_saint"], "Only supports neighbor and graph-saint loaders"
 
         if loader_type == "neighbor":
             return NeighborLoader(

@@ -4,6 +4,9 @@
 
 ## Setup
 Copy the content of [.env-example](.env-example) into a new file named `.env`
+```
+cp .env-example .env
+```
 ### Prepare data
 Create a `data/` folder, then download the enhanced modality CSV files from Google Drive, and save them in `data/modalities/`
 
@@ -50,10 +53,15 @@ python scripts/train_kge.py --gcl_embed_path ./data/embed/gcl_embed_folder --nod
 * Download `dpi_gene_feature.csv` to `data/modalities/`
 
 ### Get new modalities embeddings
+To generate new language model embeddings from the recently crawled DPI information, run the following command:
 ```
 python scripts/get_modality_embedding.py -f dpi_modality.yaml
 ```
-
+### Get GCL embeddings
+Retrieve the embedding from the GCL checkpoint using the path specified by `--gcl_embed_path` to the newly generated LLM embedding.
+```
+python scripts/get_embedding_from_ckpt.py --ckpt ./ckpt/gcl/*/*.ckpt --data biokg --gcl_embed_path ./data/embed/biokg_*
+```
 ### K-Fold Cross validation on DPI-FDA
 Run the following command to execute Link Prediction on DPI-FDA dataset:
 ```

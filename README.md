@@ -1,6 +1,6 @@
 # Biomedical Knowledge Graph
 
-<img src="assets/framwork_overview.png" alt="Framework overview" width="75%"/>
+<img src="assets/framework_overview.png" alt="Framework overview" width="75%"/>
 
 ## Setup
 Copy the content of [.env-example](.env-example) into a new file named `.env`

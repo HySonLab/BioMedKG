@@ -67,9 +67,3 @@ Run the following command to execute Link Prediction on DPI-FDA dataset:
 ```
 python scripts/cross_val.py --ckpt_path ckpt/kge/*/*.ckpt --gcl_embed_path data/gcl_embed/biokg_* --max_epoch 100 --neg_ratio 10
 ```
-
-## Contributors:
-* Viet Thanh Duy Nguyen
-* Tuan Le
-* Tien Dang
-* Truong Son Hy (Correspondent / PI)

@@ -1,8 +1,10 @@
 import torch
 import torch.nn.functional as F
 from lightning import LightningModule
-from torchmetrics import MetricCollection, AUROC, AveragePrecision, F1Score
+from torchmetrics import MetricCollection, AUROC, AveragePrecision, F1Score, RetrievalMRR, RetrievalHitRate
 from torchmetrics.wrappers import BootStrapper
+from torchmetrics.classification import BinaryConfusionMatrix
+
 
 from torch_geometric.nn import GAE
 from torch_geometric.utils import negative_sampling
@@ -118,13 +120,23 @@ class KGEModule(LightningModule):
         self.scheduler_type = scheduler_type
         self.warm_up_ratio = warm_up_ratio
 
+
+        ''' 
+        add Hits@k (1, 3, 10), MRR, and confusion matrix
+        '''
         metrics = MetricCollection(
             {
                 "AUROC": BootStrapper(AUROC(task="binary"),),
                 "AveragePrecision": BootStrapper(AveragePrecision(task="binary")),
                 "F1": BootStrapper(F1Score(task="binary")),
+                "hits@1": RetrievalHitRate(top_k=1),
+                "hits@3": RetrievalHitRate(top_k=3),
+                "hits@10": RetrievalHitRate(top_k=10),
+                "MRR": RetrievalMRR(),
+                "Confusion Matrix": BinaryConfusionMatrix()
             }
         )
+
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
         self.select_edge_type_id = select_edge_type_id

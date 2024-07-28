@@ -35,6 +35,7 @@ class PrimeKGModule(LightningDataModule):
             embed_dim=embed_dim,
             encoder=self.encoder
         )
+        self.edge_map_index = self.primekg.edge_map_index
 
         self.data = self.primekg.get_data()
 
@@ -139,7 +140,7 @@ class BioKGModule(LightningDataModule):
             embed_dim=embed_dim,
             encoder=self.encoder
         )
-
+        self.edge_map_index = self.biokg.edge_map_index
         self.data = self.biokg.get_data()
 
         if stage == "split":

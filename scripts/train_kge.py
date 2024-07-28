@@ -90,11 +90,12 @@ def main(
     if run_benchmark:
         assert ckpt_path is not None
 
+        data_module = BioKGModule(encoder=node_encoder)
+        data_module.setup(stage="split", embed_dim=embed_dim)
+
         model = KGEModule.load_from_checkpoint(ckpt_path)
         # In PrimeKG, drug - gene relation is one
         model.select_edge_type_id = 1
-        data_module = BioKGModule(encoder=node_encoder)
-        data_module.setup(stage="split", embed_dim=embed_dim)
 
     else:
         data_module = PrimeKGModule(encoder=node_encoder)
@@ -105,6 +106,8 @@ def main(
             node_init_method=node_init_method,
             modality_transform_method=modality_transform_method
         )
+
+    model.edge_mapping = data_module.edge_map_index
 
     # Setup logging/ckpt path
     if ckpt_path is None:
@@ -158,7 +161,7 @@ def main(
             save_last=True,
             )
         
-        early_stopping = EarlyStopping(monitor="val_BinaryAUROC", mode="max", min_delta=0.001, patience=1)
+        early_stopping = EarlyStopping(monitor="val_AUROC_mean", mode="max", min_delta=0.001, patience=1)
 
         logger = CometLogger(
             api_key=find_comet_api_key(),

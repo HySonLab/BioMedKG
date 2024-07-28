@@ -20,6 +20,7 @@ class TripletBase:
         self.list_edges = self.df['relation'].unique()
         self.encoder = encoder
         self.embedding_dim = embed_dim
+        self.edge_map_index = dict()
 
         self.data = HeteroData()
 
@@ -63,7 +64,7 @@ class TripletBase:
             self.data[node_type].x = embedding
         
     def _build_edge_index(self,):
-        for relation_type in tqdm(self.list_edges, desc="Load edge"):
+        for edge_id, relation_type in enumerate(tqdm(self.list_edges, desc="Load edge")):
             relation_df = self.df[self.df['relation'] == relation_type][['x_type', 'x_name', 'relation', 'y_type', 'y_name']]
             triples = relation_df[["x_type", "relation", "y_type"]].drop_duplicates().values
 
@@ -83,7 +84,7 @@ class TripletBase:
             relation = clean_name(relation)
 
             self.data[head, relation, tail].edge_index = edge_index
-
+            self.edge_map_index[edge_id] = relation_type
 
 
 class PrimeKG(TripletBase):

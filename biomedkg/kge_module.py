@@ -129,11 +129,11 @@ class KGEModule(LightningModule):
                 "AUROC": BootStrapper(AUROC(task="binary"),),
                 "AveragePrecision": BootStrapper(AveragePrecision(task="binary")),
                 "F1": BootStrapper(F1Score(task="binary")),
-                "hits@1": RetrievalHitRate(top_k=1),
-                "hits@3": RetrievalHitRate(top_k=3),
-                "hits@10": RetrievalHitRate(top_k=10),
-                "MRR": RetrievalMRR(),
-                "Confusion Matrix": ConfusionMatrix(task="multiclass")
+                "hits@1": RetrievalHitRate(top_k=1), # Add h@1
+                "hits@3": RetrievalHitRate(top_k=3), # Add h@3
+                "hits@10": RetrievalHitRate(top_k=10), # Add h@10
+                "MRR": RetrievalMRR(), # Add MRR
+                "Confusion Matrix": ConfusionMatrix(task="multiclass", num_classes=num_relation) # Add Confusion Matrix
             }
         )
 
@@ -258,6 +258,12 @@ class KGEModule(LightningModule):
         self.log_dict(output)
         self.valid_metrics.reset()
     
+        # Extract confusion matrix and calculate correct predictions per relation type
+        cm = output["val_Confusion Matrix"]
+        correct_predictions = cm.diag()
+        for i, correct in enumerate(correct_predictions):
+            self.log(f"val_correct_relation_type_{i}", correct)
+
     def test_step(self, batch, batch_idx):
         if self.llm_init_node:
             # Reshape if does not apply transformation
@@ -305,6 +311,13 @@ class KGEModule(LightningModule):
         output = self.test_metrics.compute()
         self.log_dict(output)
         self.test_metrics.reset()
+
+        # Extract confusion matrix and calculate correct predictions per relation type
+        cm = output["test_Confusion Matrix"]
+        correct_predictions = cm.diag()
+        for i, correct in enumerate(correct_predictions):
+            self.log(f"test_correct_relation_type_{i}", correct)
+            
         return output
     
     def configure_optimizers(self,):

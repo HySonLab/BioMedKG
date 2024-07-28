@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from lightning import LightningModule
 from torchmetrics import MetricCollection, AUROC, AveragePrecision, F1Score, RetrievalMRR, RetrievalHitRate
 from torchmetrics.wrappers import BootStrapper
-from torchmetrics.classification import BinaryConfusionMatrix
+from torchmetrics.classification import BinaryConfusionMatrix, ConfusionMatrix
 
 
 from torch_geometric.nn import GAE
@@ -133,7 +133,7 @@ class KGEModule(LightningModule):
                 "hits@3": RetrievalHitRate(top_k=3),
                 "hits@10": RetrievalHitRate(top_k=10),
                 "MRR": RetrievalMRR(),
-                "Confusion Matrix": BinaryConfusionMatrix()
+                "Confusion Matrix": ConfusionMatrix(task="multiclass")
             }
         )
 
@@ -243,6 +243,7 @@ class KGEModule(LightningModule):
 
         gt = torch.cat([torch.ones_like(pos_pred), torch.zeros_like(neg_pred)])
 
+        # From here, get confusion matrix and edge type array 
         self.valid_metrics.update(pred, gt.to(torch.int32))
 
         cross_entropy_loss = F.binary_cross_entropy_with_logits(pred, gt)
@@ -292,6 +293,8 @@ class KGEModule(LightningModule):
 
         pos_pred = self.model.decode(z, batch.edge_index, batch.edge_type)
         neg_pred = self.model.decode(z, neg_edge_index, neg_edge_type)
+
+        # From here, get confusion matrix and edge type array 
         pred = torch.cat([pos_pred, neg_pred])
 
         gt = torch.cat([torch.ones_like(pos_pred), torch.zeros_like(neg_pred)])

@@ -108,15 +108,16 @@ def k_fold(ckpt_path:str, gcl_embed_path: str, max_epoch:int, seed: int, neg_rat
     for train_index, test_index in kfold.split(df):
         train_data, test_data = df.iloc[train_index], df.iloc[test_index]
 
-        train_graph = TripletBase(df=train_data, embed_dim=embed_dim, encoder=encoder).get_data()
-        test_graph = TripletBase(df=test_data, embed_dim=embed_dim, encoder=encoder).get_data()
+        train_triplet = TripletBase(df=train_data, embed_dim=embed_dim, encoder=encoder)
+        train_graph = train_triplet.get_data()
 
-        train_graph = TripletBase(df=train_data, embed_dim=embed_dim, encoder=None).get_data()
-        test_graph = TripletBase(df=test_data, embed_dim=embed_dim, encoder=None).get_data()
+        test_triplet = TripletBase(df=test_data, embed_dim=embed_dim, encoder=encoder).get_data()
+        test_graph = test_triplet.get_data()
 
         model = KGEModule.load_from_checkpoint(ckpt_path)
         model.neg_ratio = neg_ratio
         model.select_edge_type_id = 1
+        model.edge_mapping = train_triplet.edge_map_index
 
         fold_result = run_fold(
             model=model,

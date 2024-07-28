@@ -9,6 +9,7 @@ from transformers.optimization import get_cosine_schedule_with_warmup, get_linea
 from typing import Tuple
 from biomedkg.factory import KGEModelFactory, ModalityFuserFactory
 from biomedkg.configs import kge_settings, node_settings, train_settings
+from biomedkg.modules.metrics import EdgeWisePrecision
 
 class KGEModule(LightningModule):
     def __init__(self,
@@ -67,6 +68,7 @@ class KGEModule(LightningModule):
                 "F1": BootStrapper(F1Score(task="binary")),
             }
         )
+        self._edge_index_map = dict()
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
         self.select_edge_type_id = select_edge_type_id
@@ -145,6 +147,8 @@ class KGEModule(LightningModule):
         gt = torch.cat([torch.ones_like(pos_pred), torch.zeros_like(neg_pred)])
 
         self.valid_metrics.update(pred, gt.to(torch.int32))
+        if hasattr(self, "edge_wise_pre_valid"):
+            self.edge_wise_pre_valid.update(pos_pred, batch.ededge_typeedge_typege)
 
         cross_entropy_loss = F.binary_cross_entropy_with_logits(pred, gt)
         reg_loss = z.pow(2).mean() + self.model.decoder.rel_emb.pow(2).mean()
@@ -155,6 +159,12 @@ class KGEModule(LightningModule):
 
     def on_validation_epoch_end(self):
         output = self.valid_metrics.compute()
+        
+        if hasattr(self, "edge_wise_pre_valid"):
+            edge_wise_pre = self.edge_wise_pre_valid.compute()
+            self.log_dict(edge_wise_pre)
+            self.edge_wise_pre_valid.reset()
+
         self.log_dict(output)
         self.valid_metrics.reset()
     
@@ -175,9 +185,17 @@ class KGEModule(LightningModule):
         gt = torch.cat([torch.ones_like(pos_pred), torch.zeros_like(neg_pred)])
 
         self.test_metrics.update(pred, gt.to(torch.int32))
+        if hasattr(self, "edge_wise_pre_test"):
+            self.edge_wise_pre_test.update(pos_pred, batch.edge_type)
 
     def on_test_epoch_end(self):
         output = self.test_metrics.compute()
+
+        if hasattr(self, "edge_wise_pre_test"):
+            edge_wise_pre = self.edge_wise_pre_test.compute()
+            self.log_dict(edge_wise_pre)
+            self.edge_wise_pre_test.reset()
+
         self.log_dict(output)
         self.test_metrics.reset()
         return output
@@ -201,3 +219,13 @@ class KGEModule(LightningModule):
             return get_linear_schedule_with_warmup(**scheduler_args)
         if self.scheduler_type == "cosine":
             return get_cosine_schedule_with_warmup(**scheduler_args)
+    
+    @property
+    def edge_mapping(self): 
+        return self._edge_index_map
+       
+    @edge_mapping.setter 
+    def edge_mapping(self, edge_mapping_dict:dict): 
+        self._edge_index_map = edge_mapping_dict
+        self.edge_wise_pre_valid = EdgeWisePrecision(class_mapping=self._edge_index_map)
+        self.edge_wise_pre_test = EdgeWisePrecision(class_mapping=self._edge_index_map)

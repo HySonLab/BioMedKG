@@ -1,5 +1,9 @@
 import torch
-from torchmetrics import Metric
+import torch.nn.functional as F
+from torchmetrics import MetricCollection, Metric
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
 
 class EdgeWisePrecision(Metric):
     def __init__(self, class_mapping: dict, threshold: float = 0.5, **kwargs):
@@ -19,9 +23,32 @@ class EdgeWisePrecision(Metric):
     def compute(self) -> dict:
         percentages = {}
         for class_idx in range(self.num_classes):
-            key_name = self.class_mapping[class_idx] + "_pre"
+            key_name = self.class_mapping[class_idx] + "_pred"
             if self.class_counts[class_idx] > 0:
                 percentages[key_name] = (self.above_threshold_counts[class_idx] / self.class_counts[class_idx]).item()
             else:
                 percentages[key_name] = 0.0
         return percentages
+
+class MeanReciprocalRank(Metric):
+    def __init__(self, dist_sync_on_step=False):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        self.add_state("reciprocal_ranks", default=torch.tensor([]), dist_reduce_fx="cat")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        # Sort predictions in descending order
+        _, ranks = torch.sort(preds, dim=1, descending=True)
+        
+        # Find the rank of the target label for each sample
+        target_ranks = torch.where(ranks == target.unsqueeze(1))[1] + 1
+        
+        # Calculate reciprocal rank for each sample
+        reciprocal_ranks = 1.0 / target_ranks.float()
+        
+        self.reciprocal_ranks = torch.cat([self.reciprocal_ranks, reciprocal_ranks])
+
+    def compute(self):
+        """
+        Compute the mean reciprocal rank.
+        """
+        return torch.mean(self.reciprocal_ranks)

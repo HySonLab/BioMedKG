@@ -1,9 +1,8 @@
 import torch
 import torch.nn.functional as F
-from torchmetrics import MetricCollection, Metric
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
+from torchmetrics import Metric
+from torchmetrics.functional.retrieval.hit_rate import retrieval_hit_rate
+from torchmetrics.functional.retrieval.reciprocal_rank import retrieval_reciprocal_rank
 
 class EdgeWisePrecision(Metric):
     def __init__(self, class_mapping: dict, threshold: float = 0.5, **kwargs):
@@ -30,47 +29,59 @@ class EdgeWisePrecision(Metric):
                 percentages[key_name] = 0.0
         return percentages
 
-class HitAtK(Metric):
-    def __init__(self, k: int = 1, **kwargs):
-        super().__init__(**kwargs)
+
+class HitsAtK(Metric):
+    """
+    Computes the Hits@k metric for evaluating ranking or recommendation systems.
+    Extends directly from torchmetrics.Metric for full customization.
+    """
+
+    def __init__(self, k: int = 10, dist_sync_on_step: bool = False):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+
         self.k = k
-        self.add_state("hits", default=torch.tensor(0, dtype=torch.float32), dist_reduce_fx="sum")
-        self.add_state("total", default=torch.tensor(0, dtype=torch.float32), dist_reduce_fx="sum")
-
-    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
-        # Ensure preds and target are 2D tensors
-        if preds.dim() == 1:
-            preds = preds.unsqueeze(0)
-            target = target.unsqueeze(0)
-        
-        for p, t in zip(preds, target):
-            _, topk_indices = torch.topk(p, self.k, largest=True, sorted=True)
-            self.hits += (t[topk_indices] == 1).any().float()
-            self.total += 1.0
-
-    def compute(self) -> float:
-        return (self.hits / self.total).item()
-    
-class MeanReciprocalRank(Metric):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.add_state("reciprocal_ranks", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("hits", default=torch.tensor(0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
-        # Ensure preds and target are 2D tensors
-        if preds.dim() == 1:
-            preds = preds.unsqueeze(0)
-            target = target.unsqueeze(0)
+    def update(self, preds: torch.Tensor, target: torch.Tensor): 
 
-        for p, t in zip(preds, target):
-            sorted_indices = torch.argsort(p, descending=True)
-            relevant_indices = (t == 1).nonzero(as_tuple=True)[0]
-            if len(relevant_indices) > 0:
-                ranks = torch.where(sorted_indices.unsqueeze(1) == relevant_indices)[0] + 1
-                rank = ranks.min().item()
-                self.reciprocal_ranks += 1.0 / rank
-            self.total += relevant_indices.numel()
+        """
+        Updates the metric state with predictions and targets.
+        """
+        hits = retrieval_hit_rate(preds, target, self.k) 
+        self.hits += hits.sum()
+        self.total += target.size(0)
 
-    def compute(self) -> float:
-        return (self.reciprocal_ranks / self.total).item()
+    def compute(self):
+        """
+        Computes the Hits@k metric over all accumulated predictions and targets.
+        """
+        return self.hits.float() / self.total
+    
+
+class MeanReciprocalRank(Metric):
+    """
+    Computes the Mean Reciprocal Rank (MRR) for evaluating ranking or recommendation systems.
+    Extends directly from torchmetrics.Metric for full customization.
+    """
+
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+
+        self.add_state("rr_sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor): 
+
+        """
+        Updates the metric state with predictions and targets.
+        """
+        rr = retrieval_reciprocal_rank(preds, target)
+        self.rr_sum += rr.sum()
+        self.total += target.size(0)
+
+    def compute(self):
+        """
+        Computes the MRR over all accumulated predictions and targets.
+        """
+        return self.rr_sum / self.total

@@ -103,8 +103,8 @@ def main(
         model = KGEModule(
             in_dim=embed_dim,
             num_relation=data_module.data.num_edge_types,
-            node_init_method=node_init_method,
-            modality_transform_method=modality_transform_method
+            # node_init_method=node_init_method,
+            # modality_transform_method=modality_transform_method
         )
 
     model.edge_mapping = data_module.edge_map_index

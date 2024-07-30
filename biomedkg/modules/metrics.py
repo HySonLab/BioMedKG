@@ -30,25 +30,47 @@ class EdgeWisePrecision(Metric):
                 percentages[key_name] = 0.0
         return percentages
 
+class HitAtK(Metric):
+    def __init__(self, k: int = 1, **kwargs):
+        super().__init__(**kwargs)
+        self.k = k
+        self.add_state("hits", default=torch.tensor(0, dtype=torch.float32), dist_reduce_fx="sum")
+        self.add_state("total", default=torch.tensor(0, dtype=torch.float32), dist_reduce_fx="sum")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
+        # Ensure preds and target are 2D tensors
+        if preds.dim() == 1:
+            preds = preds.unsqueeze(0)
+            target = target.unsqueeze(0)
+        
+        for p, t in zip(preds, target):
+            _, topk_indices = torch.topk(p, self.k, largest=True, sorted=True)
+            self.hits += (t[topk_indices] == 1).any().float()
+            self.total += 1.0
+
+    def compute(self) -> float:
+        return (self.hits / self.total).item()
+    
 class MeanReciprocalRank(Metric):
-    def __init__(self, dist_sync_on_step=False):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
-        self.add_state("reciprocal_ranks", default=torch.tensor([]), dist_reduce_fx="cat")
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.add_state("reciprocal_ranks", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self, preds: torch.Tensor, target: torch.Tensor):
-        # Sort predictions in descending order
-        _, ranks = torch.sort(preds, dim=1, descending=True)
-        
-        # Find the rank of the target label for each sample
-        target_ranks = torch.where(ranks == target.unsqueeze(1))[1] + 1
-        
-        # Calculate reciprocal rank for each sample
-        reciprocal_ranks = 1.0 / target_ranks.float()
-        
-        self.reciprocal_ranks = torch.cat([self.reciprocal_ranks, reciprocal_ranks])
+    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
+        # Ensure preds and target are 2D tensors
+        if preds.dim() == 1:
+            preds = preds.unsqueeze(0)
+            target = target.unsqueeze(0)
 
-    def compute(self):
-        """
-        Compute the mean reciprocal rank.
-        """
-        return torch.mean(self.reciprocal_ranks)
+        for p, t in zip(preds, target):
+            sorted_indices = torch.argsort(p, descending=True)
+            relevant_indices = (t == 1).nonzero(as_tuple=True)[0]
+            if len(relevant_indices) > 0:
+                ranks = torch.where(sorted_indices.unsqueeze(1) == relevant_indices)[0] + 1
+                rank = ranks.min().item()
+                self.reciprocal_ranks += 1.0 / rank
+            self.total += relevant_indices.numel()
+
+    def compute(self) -> float:
+        return (self.reciprocal_ranks / self.total).item()

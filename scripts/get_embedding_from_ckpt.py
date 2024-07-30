@@ -51,9 +51,7 @@ def main(
 ):
     assert os.path.exists(ckpt)
 
-
     device = find_device()
-
 
     seed_everything(train_settings.SEED)
    
@@ -74,7 +72,6 @@ def main(
             model = gcl_module.GGDModule.load_from_checkpoint(ckpt)
         else:
             raise NotImplementedError
-
         node_type = dir_name.split("_")[1]
         process_node = ['gene/protein'] if node_type == "gene" else [node_type]
 

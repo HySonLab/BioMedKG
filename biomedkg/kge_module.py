@@ -5,12 +5,11 @@ from torch_geometric.utils import negative_sampling
 from torchmetrics.wrappers import BootStrapper
 from torchmetrics import MetricCollection, AUROC, AveragePrecision, F1Score
 from transformers.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
-from torcheval.metrics import HitRate
 
 from typing import Tuple
 from biomedkg.factory import KGEModelFactory, ModalityFuserFactory
 from biomedkg.configs import kge_settings, node_settings, train_settings
-from biomedkg.modules.metrics import EdgeWisePrecision, MeanReciprocalRank
+from biomedkg.modules.metrics import EdgeWisePrecision, MeanReciprocalRank, HitAtK
 
 class KGEModule(LightningModule):
     def __init__(self,
@@ -67,9 +66,9 @@ class KGEModule(LightningModule):
                 "AUROC": BootStrapper(AUROC(task="binary"),),
                 "AveragePrecision": BootStrapper(AveragePrecision(task="binary")),
                 "F1": BootStrapper(F1Score(task="binary")),
-                "hits@1": HitRate(k=1),
-                "hits@3": HitRate(k=3),
-                "hits@10": HitRate(k=10),
+                "hits@1": HitAtK(k=1),
+                "hits@3": HitAtK(k=3),
+                "hits@10": HitAtK(k=10),
                 "MRR": MeanReciprocalRank()
             }
         )
@@ -153,7 +152,7 @@ class KGEModule(LightningModule):
 
         self.valid_metrics.update(pred, gt.to(torch.int32))
         if hasattr(self, "edge_wise_pre_valid"):
-            self.edge_wise_pre_valid.update(pos_pred, batch.ededge_typeedge_typege)
+            self.edge_wise_pre_valid.update(pos_pred, batch.edge_type)
 
         cross_entropy_loss = F.binary_cross_entropy_with_logits(pred, gt)
         reg_loss = z.pow(2).mean() + self.model.decoder.rel_emb.pow(2).mean()

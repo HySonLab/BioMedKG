@@ -1,0 +1,167 @@
+import os
+import pickle
+from pathlib import Path
+from typing import List
+
+import numpy as np
+import pandas as pd
+import torch
+from omegaconf import OmegaConf
+from tqdm import tqdm
+
+from biomedkg.data.embed import NodeEmbedding
+
+
+class LMMultiModalsEncode:
+    def __init__(self, config_file: str, embed_dim: int = 768, batch_size: int = 128):
+        self.conf = OmegaConf.load(config_file)
+        self.artifact_path = os.path.join(
+            "data", "embed", f"{Path(config_file).stem}_lm.pickle"
+        )
+        self.embed_dim = embed_dim
+        self.batch_size = batch_size
+        self.node_mapping = self.load()
+
+    def __call__(self, lst_node: List[str]) -> torch.Tensor:
+        node_embedding = []
+
+        for node_name in lst_node:
+            embedding = self.node_mapping.get(node_name, None)
+            if embedding is None:
+                embedding = torch.nn.init.xavier_normal_(torch.empty(2, self.embed_dim))
+            node_embedding.append(torch.tensor(embedding))
+
+        node_embedding = torch.stack(node_embedding, dim=0)
+        return node_embedding
+
+    def load(self) -> dict[str, np.array]:
+        if not os.path.exists(self.artifact_path):
+            self._get_embeddings()
+        with open(self.artifact_path, "rb") as file:
+            node_embedding = pickle.load(file)
+        return node_embedding
+
+    def _get_embeddings(self):
+        node_mapping = dict()
+        for node_type in self.conf.keys():
+            if self.conf[node_type].get("file_name", None) is None:
+                for sub_node_type in self.conf[node_type]:
+                    feature_dict = self._get_feature_dict(
+                        **self.conf[node_type][sub_node_type]
+                    )
+                    node_mapping.update(feature_dict)
+            else:
+                feature_dict = self._get_feature_dict(**self.conf[node_type])
+                node_mapping.update(feature_dict)
+
+        with open(self.artifact_path, "wb") as file:
+            pickle.dump(node_mapping, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def _get_feature_dict(
+        self,
+        file_name: str,
+        idetifier_column: str,
+        modality_columns: List[str],
+        model_name_for_each_modality: List[str],
+    ) -> dict[str, np.array]:
+
+        df = pd.read_csv(file_name)
+        df = df[[idetifier_column] + modality_columns]
+        df = df.drop_duplicates(keep="first")
+
+        model_dict = dict()
+        for modality, model_name in zip(modality_columns, model_name_for_each_modality):
+            model_dict[modality] = NodeEmbedding(model_name_or_path=model_name)
+
+        feature_dict = dict()
+        for idx in tqdm(range(0, len(df), self.batch_size)):
+            row = df.iloc[idx : idx + self.batch_size]
+
+            all_embeddings = list()
+            for modality in modality_columns:
+                modality_values = row[modality].to_list()
+
+                is_nan_mask = pd.isna(modality_values)
+
+                random_embeddings = torch.nn.init.xavier_normal_(
+                    torch.empty(np.sum(is_nan_mask), self.embed_dim)
+                )
+
+                non_nan_values = [
+                    modality_values[i]
+                    for i in range(len(modality_values))
+                    if not is_nan_mask[i]
+                ]
+                if len(non_nan_values) != 0:
+                    valid_embeddings = model_dict[modality](non_nan_values)
+
+                combined_embeddings = np.empty((len(row), self.embed_dim))
+                combined_embeddings[is_nan_mask] = random_embeddings
+
+                if len(non_nan_values) != 0:
+                    combined_embeddings[~is_nan_mask] = valid_embeddings
+
+                all_embeddings.append(combined_embeddings)
+
+            embeddings = np.stack(all_embeddings, axis=1)
+
+            # Normalize the embeddings across modalities
+            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+            normalized_embeddings = embeddings / norms
+
+            feature_dict.update(
+                dict(
+                    zip(
+                        row[idetifier_column].to_list(),
+                        [
+                            normalized_embeddings[i]
+                            for i in range(normalized_embeddings.shape[0])
+                        ],
+                    )
+                )
+            )
+
+        del model_dict
+        import gc
+
+        gc.collect()
+
+        return feature_dict
+
+
+class RandomEncode:
+    def __init__(
+        self,
+        embed_dim: int = 768,
+    ):
+        self.embed_dim = embed_dim
+
+    def __call__(self, lst_node: List[str]) -> torch.Tensor:
+        node_embedding = torch.nn.init.xavier_normal_(
+            torch.empty(len(lst_node), self.embed_dim)
+        )
+
+        return node_embedding
+
+
+if __name__ == "__main__":
+    encoder = LMMultiModalsEncode(
+        config_file="../../../configs/lm_modality/primekg_modality.yaml"
+    )
+
+    node_name_lst = [
+        "(1,2,6,7-3H)Testosterone",
+        "(4-{(2S)-2-[(tert-butoxycarbonyl)amino]-3-methoxy-3-oxopropyl}phenyl)methaneseleninic acid",
+        "(6R)-Folinic acid",
+        "(6S)-5,6,7,8-tetrahydrofolic acid",
+        "(R)-warfarin",
+        "(S)-2-Amino-3-(4h-Selenolo[3,2-B]-Pyrrol-6-Yl)-Propionic Acid",
+        "(S)-2-Amino-3-(6h-Selenolo[2,3-B]-Pyrrol-4-Yl)-Propionic Acid",
+        "(S)-Warfarin",
+        "1,10-Phenanthroline",
+        "1-Testosterone",
+    ]
+
+    embeddings = encoder(node_name_lst)
+
+    print(embeddings.size())

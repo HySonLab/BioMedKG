@@ -1,112 +1,31 @@
 import os
 import time
-import json
-import argparse
 
-import torch
+import hydra
+from hydra.utils import instantiate
 from lightning.pytorch import Trainer, seed_everything
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import CometLogger
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from omegaconf import DictConfig
 
-from biomedkg.gcl_module import DGIModule, GRACEModule, GGDModule
-from biomedkg.data_module import PrimeKGModule
-from biomedkg.factory import NodeEncoderFactory
-from biomedkg.modules.utils import find_comet_api_key
-from biomedkg.configs import train_settings, gcl_settings, node_settings
+from biomedkg.common import find_comet_api_key
+from biomedkg.gcl_module import DGIModule, GGDModule, GRACEModule
 
 
-def parse_opt():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-            '--task', 
-            type=str, 
-            action='store', 
-            choices=['train', 'test'], 
-            default='train', 
-            help="Do training or testing task")
-    
-    parser.add_argument(
-            '--model_name', 
-            type=str, 
-            action='store', 
-            choices=['dgi', 'grace', 'ggd'], 
-            default='dgi', 
-            help="Select contrastive model name")
-    
-    parser.add_argument(
-            '--node_type', 
-            type=str, 
-            action='store', 
-            required=True,
-            choices=['gene', 'drug', 'disease'], 
-            help="Train contrastive learning on which node type")   
-
-    parser.add_argument(
-            '--node_init_method',
-            type=str, 
-            action='store', 
-            required=True,
-            choices=["random", "llm"],
-            help="Select node init method")    
-    
-    parser.add_argument(
-            '--modality_transform_method', 
-            type=str, 
-            action='store', 
-            required=True,
-            choices=['attention', 'redaf', 'None'], 
-            help="Modality transform methods")    
-    
-    parser.add_argument(
-            '--ckpt_path', 
-            type=str, 
-            default=None,
-            required=False,
-            help="Path to checkpoint")
-    opt = parser.parse_args()
-    return opt
-
-
-def main(
-          task:str, 
-          model_name:str,
-          node_type:str, 
-          modality_transform_method: str,
-          node_init_method:str,
-          ckpt_path:str = None,
-          ):
-    seed_everything(train_settings.SEED)
-
-    if node_init_method == "random":
-        modality_transform_method = None
-
-    # Process data
-    process_node = ['gene/protein'] if node_type == "gene" else [node_type]
-
-    node_encoder, embed_dim = NodeEncoderFactory.create_encoder(
-            node_init_method=node_init_method,
-            entity_type=node_type,
-        )
-
-    data_module = PrimeKGModule(
-        process_node_lst=process_node,
-        encoder=node_encoder
-    )
-
-    data_module.setup(stage="split", embed_dim=embed_dim)
+def create_gcl_model(cfg: DictConfig):
+    model_name = cfg.model_name
 
     gcl_kwargs = {
-        "in_dim": embed_dim,
-        "hidden_dim": gcl_settings.GCL_HIDDEN_DIM,
-        "out_dim": node_settings.GCL_TRAINED_NODE_DIM,
-        "num_hidden_layers": gcl_settings.GCL_NUM_HIDDEN,
-        "scheduler_type": train_settings.SCHEDULER_TYPE,
-        "learning_rate": train_settings.LEARNING_RATE,
-        "warm_up_ratio": train_settings.WARM_UP_RATIO,
-        "modality_transform_method": modality_transform_method,
+        "in_dim": cfg.in_dim,
+        "hidden_dim": cfg.hidden_dim,
+        "out_dim": cfg.out_dim,
+        "num_hidden_layers": cfg.num_layers,
+        "scheduler_type": cfg.scheduler_type,
+        "learning_rate": cfg.learning_rate,
+        "warm_up_ratio": cfg.warm_up_ratio,
+        "fuse_method": cfg.fuse_method,
     }
 
-    # Initialize GCL module
     if model_name == "dgi":
         model = DGIModule(**gcl_kwargs)
     elif model_name == "grace":
@@ -116,85 +35,96 @@ def main(
     else:
         raise NotImplementedError
 
+    return model
+
+
+@hydra.main(version_base=None, config_path="../configs", config_name="config")
+def main(cfg: DictConfig):
+    seed_everything(cfg.seed)
+
+    if cfg.data.get("node_type", None) is not None:
+        if isinstance(cfg.data.node_type, list) and len(cfg.data.node_type) > 1:
+            raise ValueError("Please select only one node type")
+
+        if cfg.data.node_type.startswith("gene"):
+            cfg.data.node_type = ["gene/protein"]
+        else:
+            cfg.data.node_type = [cfg.data.node_type]
+
+    data_module = instantiate(cfg.data)
+    data_module.setup(stage="split")
+
+    model = create_gcl_model(cfg=cfg.model)
+
     # Prepare trainer args
     trainer_args = {
-        "accelerator": "auto", 
+        "accelerator": "auto",
         "log_every_n_steps": 10,
-        "deterministic": True, 
+        "deterministic": True,
+        "devices": cfg.devices,
     }
 
-    if torch.cuda.device_count() > 1:
-        trainer_args.update(
-            {
-                "devices": train_settings.DEVICES,
-            }
-        )
+    # Debug mode
+    if cfg.debug:
+        trainer_args["fast_dev_run"] = True
 
-    # Train
-    if task == "train":
-        log_name = f"{model_name}_{node_type}_{modality_transform_method}_{str(int(time.time()))}"
-        exp_name = log_name
-        ckpt_dir = os.path.join(train_settings.OUT_DIR, "gcl", node_type, log_name)
-        log_dir = os.path.join(train_settings.LOG_DIR, "gcl", node_type, log_name)
+    log_name = f"{cfg.model.model_name}_{cfg.data.node_type}_{cfg.model.fuse_method}_{str(int(time.time()))}"
+    ckpt_dir = os.path.join(cfg.ckpt_dir, "gcl", cfg.data.node_type[0], log_name)
+    log_dir = os.path.join(cfg.log_dir, "gcl", cfg.data.node_type[0], log_name)
 
-        if not os.path.exists(ckpt_dir):
-            os.makedirs(ckpt_dir)
+    if not os.path.exists(ckpt_dir):
+        os.makedirs(ckpt_dir)
 
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
-        # Setup callback
-        checkpoint_callback = ModelCheckpoint(
-            dirpath=ckpt_dir, 
-            monitor="val_loss", 
-            save_top_k=3, 
-            mode="min",
-            save_last=True,
-            )
-        
-        early_stopping = EarlyStopping(monitor="val_loss", mode="min")
+    # Setup callback
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=ckpt_dir,
+        monitor="val_loss",
+        save_top_k=1,
+        mode="min",
+    )
 
-        logger = CometLogger(
-            api_key=find_comet_api_key(),
-            project_name=f"BioMedKG-GCL-{node_type}",
-            save_dir=log_dir,
-            experiment_name=exp_name,
-        )
+    early_stopping = EarlyStopping(monitor="val_loss", mode="min")
 
-        trainer_args.update(
-            {
-                "max_epochs": train_settings.EPOCHS,
-                "check_val_every_n_epoch": train_settings.VAL_EVERY_N_EPOCH,
-                "enable_checkpointing": True,     
-                "gradient_clip_val": 1.0,
-                "callbacks": [checkpoint_callback, early_stopping],
-                "default_root_dir": ckpt_dir,
-                "logger": logger, 
-            }
-        )
+    logger = CometLogger(
+        api_key=find_comet_api_key(),
+        project_name=f"BioMedKG-GCL-{cfg.data.node_type}",
+        save_dir=log_dir,
+        experiment_name=log_name,
+    )
 
-        trainer = Trainer(**trainer_args)
+    trainer_args.update(
+        {
+            "max_epochs": cfg.epochs,
+            "check_val_every_n_epoch": cfg.val_every_epoch,
+            "enable_checkpointing": True,
+            "gradient_clip_val": 1.0,
+            "callbacks": [checkpoint_callback, early_stopping],
+            "default_root_dir": ckpt_dir,
+            "logger": logger,
+        }
+    )
 
-        trainer.fit(
-            model=model,
-            train_dataloaders=data_module.train_dataloader(loader_type="neighbor"),
-            val_dataloaders=data_module.val_dataloader(loader_type="neighbor"),
-            ckpt_path=ckpt_path 
-        )
+    trainer = Trainer(**trainer_args)
 
-    # Test
-    elif task == "test":
-        assert ckpt_path is not None, "Please specify checkpoint path."
-        trainer = Trainer(**trainer_args)
-        trainer.test(
-             model=model,
-             dataloaders=data_module.test_dataloader(loader_type="neighbor"),
-             ckpt_path=ckpt_path,
-        )
-    
-    else:
-        raise NotImplementedError
+    trainer.fit(
+        model=model,
+        train_dataloaders=data_module.train_dataloader(),
+        val_dataloaders=data_module.val_dataloader(),
+    )
+
+    test_args = {
+        "model": model,
+        "dataloaders": data_module.test_dataloader(),
+    }
+
+    if not cfg.debug:
+        test_args["ckpt_path"] = "best"
+
+    trainer.test(**test_args)
 
 
 if __name__ == "__main__":
-    main(**vars(parse_opt()))
+    main()

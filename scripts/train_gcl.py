@@ -68,7 +68,7 @@ def main(cfg: DictConfig):
     if cfg.debug:
         trainer_args["fast_dev_run"] = True
 
-    log_name = f"{cfg.model.model_name}_{cfg.data.node_type}_{cfg.model.fuse_method}_{str(int(time.time()))}"
+    log_name = f"{cfg.model.model_name}_{cfg.data.node_type[0]}_{cfg.model.fuse_method}_{str(int(time.time()))}"
     ckpt_dir = os.path.join(cfg.ckpt_dir, "gcl", cfg.data.node_type[0], log_name)
     log_dir = os.path.join(cfg.log_dir, "gcl", cfg.data.node_type[0], log_name)
 
@@ -86,7 +86,7 @@ def main(cfg: DictConfig):
         mode="min",
     )
 
-    early_stopping = EarlyStopping(monitor="val_loss", mode="min")
+    early_stopping = EarlyStopping(monitor="val_loss", mode="min", patience=5)
 
     logger = CometLogger(
         api_key=find_comet_api_key(),

@@ -38,18 +38,21 @@ def create_gcl_model(cfg: DictConfig):
     return model
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="config")
+@hydra.main(version_base=None, config_path="../configs", config_name="gcl")
 def main(cfg: DictConfig):
     seed_everything(cfg.seed)
 
-    if cfg.data.get("node_type", None) is not None:
-        if isinstance(cfg.data.node_type, list) and len(cfg.data.node_type) > 1:
-            raise ValueError("Please select only one node type")
+    log_name = f"{cfg.model.model_name}_{cfg.model.fuse_method}_{cfg.data.node_init_method}_{str(int(time.time()))}"
+    ckpt_dir = os.path.join(cfg.ckpt_dir, "gcl", cfg.data.node_type, log_name)
+    log_dir = os.path.join(cfg.log_dir, "gcl", cfg.data.node_type, log_name)
 
-        if cfg.data.node_type.startswith("gene"):
-            cfg.data.node_type = ["gene/protein"]
-        else:
-            cfg.data.node_type = [cfg.data.node_type]
+    if isinstance(cfg.data.node_type, list) and len(cfg.data.node_type) > 1:
+        raise ValueError("Please select only one node type")
+
+    if cfg.data.node_type.startswith("gene"):
+        cfg.data.node_type = ["gene/protein"]
+    else:
+        cfg.data.node_type = [cfg.data.node_type]
 
     data_module = instantiate(cfg.data)
     data_module.setup(stage="split")
@@ -68,15 +71,8 @@ def main(cfg: DictConfig):
     if cfg.debug:
         trainer_args["fast_dev_run"] = True
 
-    log_name = f"{cfg.model.model_name}_{cfg.data.node_type[0]}_{cfg.model.fuse_method}_{str(int(time.time()))}"
-    ckpt_dir = os.path.join(cfg.ckpt_dir, "gcl", cfg.data.node_type[0], log_name)
-    log_dir = os.path.join(cfg.log_dir, "gcl", cfg.data.node_type[0], log_name)
-
-    if not os.path.exists(ckpt_dir):
-        os.makedirs(ckpt_dir)
-
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    os.makedirs(ckpt_dir, exist_ok=True)
+    os.makedirs(log_dir, exist_ok=True)
 
     # Setup callback
     checkpoint_callback = ModelCheckpoint(

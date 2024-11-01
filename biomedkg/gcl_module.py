@@ -28,7 +28,7 @@ class BaseGCL(LightningModule):
     ):
         super().__init__()
 
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["model"])
 
         self.model = model
         self.modality_transform = FusionFactory.create_fuser(
@@ -112,7 +112,7 @@ class DGIModule(BaseGCL):
         warm_up_ratio: float = 0.03,
         fuse_method: str = None,
     ):
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["model"])
 
         model = DGI(
             encoder=GCNEncoder(
@@ -155,7 +155,7 @@ class GRACEModule(BaseGCL):
         warm_up_ratio: float = 0.03,
         fuse_method: str = None,
     ):
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["model"])
 
         model = GRACE(
             encoder=GCNEncoder(
@@ -202,7 +202,7 @@ class GGDModule(BaseGCL):
         warm_up_ratio: float = 0.03,
         fuse_method: str = None,
     ):
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["model"])
 
         model = GGD(
             encoder=GCNEncoder(

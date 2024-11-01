@@ -2,15 +2,22 @@ import torch_geometric.transforms as T
 from lightning import LightningDataModule
 from torch_geometric.loader import NeighborLoader
 
-from biomedkg.data import BioKG, LMMultiModalsEncode, PrimeKG, RandomEncode
+from biomedkg.data import BioKG, GCLEncode, LMMultiModalsEncode, PrimeKG, RandomEncode
 
 
-def get_node_encode_method(node_init_method: str, embed_dim: int):
+def get_node_encode_method(
+    node_init_method: str, embed_dim: int, model_name: str, fuse_method: str
+):
     if node_init_method is None or node_init_method == "random":
         return RandomEncode(embed_dim=embed_dim)
     elif node_init_method == "lm":
         return LMMultiModalsEncode(
             config_file="configs/lm_modality/primekg_modality.yaml", embed_dim=embed_dim
+        )
+    elif node_init_method == "gcl":
+        return GCLEncode(
+            model_name=model_name,
+            fuse_method=fuse_method,
         )
 
 
@@ -24,6 +31,8 @@ class PrimeKGModule(LightningDataModule):
         val_ratio: float,
         test_ratio: float,
         node_init_method: str = None,
+        gcl_model_name: str = None,
+        gcl_fuse_method: str = None,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -34,7 +43,10 @@ class PrimeKGModule(LightningDataModule):
         self.batch_size = batch_size
 
         self.encoder = get_node_encode_method(
-            node_init_method=node_init_method, embed_dim=embed_dim
+            node_init_method=node_init_method,
+            embed_dim=embed_dim,
+            model_name=gcl_model_name,
+            fuse_method=gcl_fuse_method,
         )
 
     def setup(self, stage: str = "split"):

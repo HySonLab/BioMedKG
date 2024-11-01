@@ -1,3 +1,4 @@
+import glob
 import os
 import pickle
 from pathlib import Path
@@ -9,7 +10,9 @@ import torch
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
+from biomedkg import gcl_module
 from biomedkg.data.embed import NodeEmbedding
+from biomedkg.data_module import PrimeKGModule
 
 
 class LMMultiModalsEncode:
@@ -142,6 +145,91 @@ class RandomEncode:
         )
 
         return node_embedding
+
+
+class GCLEncode:
+    data_gcl = os.path.join("data", "gcl_embed")
+    os.makedirs(data_gcl, exist_ok=True)
+
+    gcl_ckpt = os.path.join("ckpt", "gcl")
+    assert os.path.exists(gcl_ckpt), "Can't find checkpoints from {gcl_ckpt}"
+
+    def __init__(self, model_name: str, fuse_method: str):
+        self.model_name = model_name
+        self.fuse_method = fuse_method
+        self.artifact_path = os.path.join(
+            self.data_gcl, f"{model_name}_{fuse_method}.pickle"
+        )
+        self.node_mapping = self.load()
+
+    def __call__(self, lst_node: List[str]) -> torch.Tensor:
+        node_embedding = []
+
+        for node_name in lst_node:
+            embedding = self.node_mapping.get(node_name, None)
+            if embedding is None:
+                embedding = torch.nn.init.xavier_normal_(torch.empty(2, self.embed_dim))
+            node_embedding.append(torch.tensor(embedding))
+
+        node_embedding = torch.stack(node_embedding, dim=0)
+        return node_embedding
+
+    def load(self) -> dict[str, np.array]:
+        if not os.path.exists(self.artifact_path):
+            self._get_embeddings()
+        with open(self.artifact_path, "rb") as file:
+            node_embedding = pickle.load(file)
+        return node_embedding
+
+    def _get_embeddings(self):
+        node_mapping = dict()
+
+        for node_type in ["gene", "drug", "disease"]:
+            pattern = f"{self.gcl_ckpt}/{node_type}/{self.model_name}*{self.fuse_method}*lm*/*.ckpt"
+            all_files = glob.glob(pattern)
+
+            assert len(all_files) != 0, f"Can't find checkpoint with pattern {pattern}"
+
+            ckpt_path = all_files[0]
+
+            if self.model_name == "dgi":
+                model = gcl_module.DGIModule.load_from_checkpoint(ckpt_path)
+            elif self.model_name == "grace":
+                model = gcl_module.GRACEModule.load_from_checkpoint(ckpt_path)
+            elif self.model_name == "ggd":
+                model = gcl_module.GGDModule.load_from_checkpoint(ckpt_path)
+            else:
+                raise NotImplementedError
+
+            if node_type.startswith("gene"):
+                node_type = "gene/protein"
+
+            data_args = {
+                "data_dir": "./data/primekg",
+                "embed_dim": 768,
+                "node_type": [node_type],
+                "batch_size": 128,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
+                "node_init_method": "lm",
+            }
+
+            data_module = PrimeKGModule(**data_args)
+            data_module.setup(stage="split")
+
+            node_list = data_module.primekg.node_list
+            dataloader = data_module.subgraph_dataloader()
+
+            for nodes, batch in tqdm(zip(node_list, dataloader), total=len(dataloader)):
+                batch = batch.to(model.device)
+                with torch.no_grad():
+                    out = model(batch.x, batch.edge_index)
+                    out = out.detach().cpu().numpy()[: batch.batch_size]
+
+                node_mapping[nodes] = out
+
+        with open(self.artifact_path, "wb") as file:
+            pickle.dump(node_mapping, file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":

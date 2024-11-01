@@ -18,9 +18,11 @@ class TripletBase:
         self.df = df
         self.encoder = encoder
 
-        self.data, self.edge_map_index = self.construct_hetero_data()
+        self.data, self.edge_map_index, self.node_list = self.construct_hetero_data()
 
     def construct_hetero_data(self) -> tuple:
+        all_node_name = list()
+
         list_nodes = np.unique(
             np.concatenate([self.df["x_type"].unique(), self.df["y_type"].unique()])
         )
@@ -40,6 +42,7 @@ class TripletBase:
             # Construct the node to index mapping
             _mapping = dict()
             lst_node_name: list[str] = sorted(lst_node_name)
+            all_node_name.extend(lst_node_name)
 
             for index, node_name in enumerate(lst_node_name):
                 _mapping[node_name] = index
@@ -81,4 +84,4 @@ class TripletBase:
             data[head, relation, tail].edge_index = edge_index.to(torch.long)
             index_to_edge[edge_id] = relation_type
 
-        return data.to_homogeneous(), index_to_edge
+        return data.to_homogeneous(), index_to_edge, all_node_name

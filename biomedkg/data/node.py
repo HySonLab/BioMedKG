@@ -10,9 +10,8 @@ import torch
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
-from biomedkg import gcl_module
+from biomedkg import data_module, gcl_module
 from biomedkg.data.embed import NodeEmbedding
-from biomedkg.data_module import PrimeKGModule
 
 
 class LMMultiModalsEncode:
@@ -214,11 +213,11 @@ class GCLEncode:
                 "node_init_method": "lm",
             }
 
-            data_module = PrimeKGModule(**data_args)
-            data_module.setup(stage="split")
+            data = data_module.PrimeKGModule(**data_args)
+            data.setup(stage="split")
 
-            node_list = data_module.primekg.node_list
-            dataloader = data_module.subgraph_dataloader()
+            node_list = data.primekg.node_list
+            dataloader = data.subgraph_dataloader()
 
             for nodes, batch in tqdm(zip(node_list, dataloader), total=len(dataloader)):
                 batch = batch.to(model.device)

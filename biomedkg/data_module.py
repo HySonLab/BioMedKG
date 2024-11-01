@@ -2,20 +2,20 @@ import torch_geometric.transforms as T
 from lightning import LightningDataModule
 from torch_geometric.loader import NeighborLoader
 
-from biomedkg.data import BioKG, GCLEncode, LMMultiModalsEncode, PrimeKG, RandomEncode
+from biomedkg.data import dataset, node
 
 
 def get_node_encode_method(
     node_init_method: str, embed_dim: int, model_name: str, fuse_method: str
 ):
     if node_init_method is None or node_init_method == "random":
-        return RandomEncode(embed_dim=embed_dim)
+        return node.RandomEncode(embed_dim=embed_dim)
     elif node_init_method == "lm":
-        return LMMultiModalsEncode(
+        return node.LMMultiModalsEncode(
             config_file="configs/lm_modality/primekg_modality.yaml", embed_dim=embed_dim
         )
     elif node_init_method == "gcl":
-        return GCLEncode(
+        return node.GCLEncode(
             model_name=model_name,
             fuse_method=fuse_method,
         )
@@ -50,7 +50,7 @@ class PrimeKGModule(LightningDataModule):
         )
 
     def setup(self, stage: str = "split"):
-        self.primekg = PrimeKG(
+        self.primekg = dataset.PrimeKG(
             data_dir=self.data_dir, node_type=self.node_type, encoder=self.encoder
         )
         self.edge_map_index = self.primekg.edge_map_index
@@ -130,7 +130,7 @@ class BioKGModule(LightningDataModule):
         )
 
     def setup(self, stage: str = "split"):
-        self.biokg = BioKG(data_dir=self.data_dir, encoder=self.encoder)
+        self.biokg = dataset.BioKG(data_dir=self.data_dir, encoder=self.encoder)
         self.edge_map_index = self.biokg.edge_map_index
         self.data = self.biokg.data
 

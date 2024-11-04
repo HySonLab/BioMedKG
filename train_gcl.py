@@ -19,7 +19,7 @@ def create_gcl_model(cfg: DictConfig):
         "in_dim": cfg.in_dim,
         "hidden_dim": cfg.hidden_dim,
         "out_dim": cfg.out_dim,
-        "num_hidden_layers": cfg.num_layers,
+        "num_hidden_layers": cfg.num_hidden_layers,
         "scheduler_type": cfg.scheduler_type,
         "learning_rate": cfg.learning_rate,
         "warm_up_ratio": cfg.warm_up_ratio,
@@ -38,7 +38,7 @@ def create_gcl_model(cfg: DictConfig):
     return model
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="gcl")
+@hydra.main(version_base=None, config_path="configs", config_name="gcl")
 def main(cfg: DictConfig):
     seed_everything(cfg.seed)
 

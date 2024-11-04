@@ -1,0 +1,10 @@
+defaults:
+  - base
+
+encoder_name: "rgcn" # rgcn, rgat
+decoder_name: "dismult" # transe, dismult, complex
+in_dim: 256
+hidden_dim: 256
+out_dim: 256
+num_hidden_layers: 2
+num_heads: 2

@@ -29,26 +29,17 @@ class KGEModule(LightningModule):
         scheduler_type: str,
         learning_rate: float,
         warm_up_ratio: float,
-        select_edge_type_id: int,
+        fuse_method: str,
         neg_ratio: int,
         node_init_method: str,
-        fuse_method: str,
     ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.feature_embedding_dim = in_dim
-
-        self.llm_init_node = False
-
-        if node_init_method == "llm":
-            self.llm_init_node = True
-            self.modality_transform = FusionFactory.create_fuser(method=fuse_method)
-
-        self.save_hyperparameters(
-            {
-                "node_init_method": node_init_method,
-            }
+        self.modality_transform = (
+            FusionFactory.create_fuser(method=fuse_method)
+            if node_init_method == "lm"
+            else None
         )
 
         self.model = KGEModelFactory.get_model(
@@ -62,9 +53,12 @@ class KGEModule(LightningModule):
             num_heads=num_heads,
         )
 
-        self.lr = learning_rate
-        self.scheduler_type = scheduler_type
-        self.warm_up_ratio = warm_up_ratio
+        self.lr, self.scheduler_type, self.warm_up_ratio, self.neg_ratio = (
+            learning_rate,
+            scheduler_type,
+            warm_up_ratio,
+            neg_ratio,
+        )
 
         metrics = MetricCollection(
             {
@@ -78,31 +72,32 @@ class KGEModule(LightningModule):
         self._edge_index_map = dict()
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
-        self.select_edge_type_id = select_edge_type_id
-        self.neg_ratio = neg_ratio
 
     def fusion_fn(self, x) -> torch.Tensor:
-        if self.llm_init_node:
-            if self.modality_transform is None:
-                x = torch.mean(x, dim=1)
-            else:
-                x = self.modality_transform(x)
+        if self.modality_transform:
+            x = self.modality_transform(x)
+
+        elif x.dim() == 3:
+            x = torch.mean(x, dim=1)
 
         return x
 
     def sample_neg_edges(
         self, edge_index: torch.Tensor, edge_type: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.neg_ratio is None:
-            neg_edge_index = negative_sampling(edge_index)
-            neg_edge_type = edge_type
+        """Sampling negative edges"""
+        num_neg_samples = (
+            self.neg_ratio * edge_index.size(-1) if self.neg_ratio else None
+        )
+        neg_edge_index = negative_sampling(edge_index, num_neg_samples=num_neg_samples)
+
+        if self.neg_ratio:
+            neg_edge_type = edge_type.repeat(self.neg_ratio)[
+                torch.randperm(self.neg_ratio * edge_type.size(0))
+            ]
         else:
-            neg_edge_index = negative_sampling(
-                edge_index, num_neg_samples=self.neg_ratio * edge_index.size(-1)
-            )
-            neg_edge_type = edge_type.repeat(self.neg_ratio)
-            neg_edge_indices = torch.randperm(neg_edge_type.size(0))
-            neg_edge_type = neg_edge_type[neg_edge_indices]
+            neg_edge_type = edge_type
+
         return neg_edge_index, neg_edge_type
 
     def forward(self, x, edge_index, edge_type):
@@ -112,10 +107,6 @@ class KGEModule(LightningModule):
 
     def training_step(self, batch):
         x = self.fusion_fn(x=batch.x)
-
-        if self.select_edge_type_id is not None:
-            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
-
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index, neg_edge_type = self.sample_neg_edges(
@@ -137,10 +128,6 @@ class KGEModule(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x = self.fusion_fn(x=batch.x)
-
-        if self.select_edge_type_id is not None:
-            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
-
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index, neg_edge_type = self.sample_neg_edges(
@@ -155,7 +142,7 @@ class KGEModule(LightningModule):
 
         self.valid_metrics.update(pred, gt.to(torch.int32))
         if hasattr(self, "edge_wise_pre_valid"):
-            self.edge_wise_pre_valid.update(pos_pred, batch.ededge_typeedge_typege)
+            self.edge_wise_pre_valid.update(pos_pred, batch.edge_type)
 
         cross_entropy_loss = F.binary_cross_entropy_with_logits(pred, gt)
         reg_loss = z.pow(2).mean() + self.model.decoder.rel_emb.pow(2).mean()
@@ -177,10 +164,6 @@ class KGEModule(LightningModule):
 
     def test_step(self, batch, batch_idx):
         x = self.fusion_fn(x=batch.x)
-
-        if self.select_edge_type_id is not None:
-            batch.edge_type = torch.full_like(batch.edge_type, self.select_edge_type_id)
-
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index, neg_edge_type = self.sample_neg_edges(

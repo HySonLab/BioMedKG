@@ -31,7 +31,7 @@ class PrimeKGModule(LightningDataModule):
         val_ratio: float,
         test_ratio: float,
         node_init_method: str = None,
-        gcl_model_name: str = None,
+        gcl_model: str = None,
         gcl_fuse_method: str = None,
     ):
         super().__init__()
@@ -45,7 +45,7 @@ class PrimeKGModule(LightningDataModule):
         self.encoder = get_node_encode_method(
             node_init_method=node_init_method,
             embed_dim=embed_dim,
-            model_name=gcl_model_name,
+            model_name=gcl_model,
             fuse_method=gcl_fuse_method,
         )
 

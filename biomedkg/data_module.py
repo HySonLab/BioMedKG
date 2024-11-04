@@ -16,8 +16,7 @@ def get_node_encode_method(
         )
     elif node_init_method == "gcl":
         return node.GCLEncode(
-            model_name=model_name,
-            fuse_method=fuse_method,
+            model_name=model_name, fuse_method=fuse_method, embed_dim=embed_dim
         )
 
 

@@ -153,9 +153,10 @@ class GCLEncode:
     gcl_ckpt = os.path.join("ckpt", "gcl")
     assert os.path.exists(gcl_ckpt), "Can't find checkpoints from {gcl_ckpt}"
 
-    def __init__(self, model_name: str, fuse_method: str):
+    def __init__(self, model_name: str, fuse_method: str, embed_dim: int):
         self.model_name = model_name
         self.fuse_method = fuse_method
+        self.embed_dim = embed_dim
         self.artifact_path = os.path.join(
             self.data_gcl, f"{model_name}_{fuse_method}.pickle"
         )
@@ -163,11 +164,10 @@ class GCLEncode:
 
     def __call__(self, lst_node: List[str]) -> torch.Tensor:
         node_embedding = []
-
         for node_name in lst_node:
             embedding = self.node_mapping.get(node_name, None)
             if embedding is None:
-                embedding = torch.nn.init.xavier_normal_(torch.empty(2, self.embed_dim))
+                embedding = torch.nn.init.xavier_normal_(torch.empty(1, self.embed_dim))
             node_embedding.append(torch.tensor(embedding))
 
         node_embedding = torch.stack(node_embedding, dim=0)

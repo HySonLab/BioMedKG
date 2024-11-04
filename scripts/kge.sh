@@ -30,6 +30,7 @@ python3 train_kge.py \
     gcl_model=$GCL_MODEL \
     gcl_fuse_method=$GCL_FUSE_METHOD \
     data.batch_size=$BATCH_SIZE \
+    data.embed_dim=$INIT_DIM \
     data.node_init_method=$NODE_INIT_METHOD \
     model.in_dim=$INIT_DIM \
     model.learning_rate=$LEARNING_RATE \

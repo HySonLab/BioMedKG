@@ -37,7 +37,7 @@ class KGEModule(LightningModule):
         self.save_hyperparameters()
 
         self.modality_transform = (
-            FusionFactory.create_fuser(method=fuse_method)
+            FusionFactory.create_fuser(method=fuse_method, embed_dim=in_dim)
             if node_init_method == "lm"
             else None
         )

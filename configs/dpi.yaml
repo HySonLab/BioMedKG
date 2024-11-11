@@ -1,0 +1,17 @@
+defaults:
+  - _self_
+  - data: dpi
+  - model: kge
+
+seed: 42
+epochs: 100
+ckpt_dir: "./ckpt"
+log_dir: "./log"
+val_every_epoch: 2
+devices: 0,1
+debug: false
+
+neg_ratio: none
+gcl_model: "ggd" # dgi, grace, ggd
+gcl_fuse_method: "attention" # attention, redaf
+pretrained_path: ""

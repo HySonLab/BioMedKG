@@ -33,7 +33,7 @@ def main(cfg: DictConfig):
         f"{cfg.model.encoder_name}_{cfg.model.decoder_name}_{cfg.data.node_init_method}"
     )
     if cfg.data.node_init_method == "gcl":
-        exp_name = exp_name + f"{cfg.gcl_model}_{cfg.gcl_fuse_method}"
+        exp_name = exp_name + f"_{cfg.gcl_model}_{cfg.gcl_fuse_method}"
     exp_name = exp_name + str(int(time.time()))
     ckpt_dir = os.path.join(cfg.ckpt_dir, "kge", exp_name)
     log_dir = os.path.join(cfg.log_dir, "kge", exp_name)
@@ -90,8 +90,6 @@ def main(cfg: DictConfig):
         train_dataloaders=data_module.train_dataloader(),
         val_dataloaders=data_module.val_dataloader(),
     )
-
-    trainer = Trainer(**trainer_args)
 
     test_args = {
         "model": model,

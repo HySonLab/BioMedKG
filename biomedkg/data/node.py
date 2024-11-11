@@ -34,7 +34,7 @@ class LMMultiModalsEncode:
             node_embedding.append(torch.tensor(embedding))
 
         node_embedding = torch.stack(node_embedding, dim=0)
-        return node_embedding
+        return node_embedding.to(torch.float)
 
     def load(self) -> dict[str, np.array]:
         if not os.path.exists(self.artifact_path):

@@ -56,7 +56,7 @@ class TripletBase:
             embedding = self.encoder(lst_node_name)
 
             node_type = clean_name(node_type)
-            data[node_type].x = torch.tensor(embedding, dtype=torch.float)
+            data[node_type].x = embedding
 
         for edge_id, relation_type in enumerate(tqdm(list_edges, desc="Load edge")):
             relation_df = self.df[self.df["relation"] == relation_type][

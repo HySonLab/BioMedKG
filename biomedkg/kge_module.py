@@ -72,6 +72,7 @@ class KGEModule(LightningModule):
         self._edge_index_map = dict()
         self.valid_metrics = metrics.clone(prefix="val_")
         self.test_metrics = metrics.clone(prefix="test_")
+        self._fix_edge_id = None
 
     def fusion_fn(self, x) -> torch.Tensor:
         if self.modality_transform:
@@ -107,6 +108,10 @@ class KGEModule(LightningModule):
 
     def training_step(self, batch):
         x = self.fusion_fn(x=batch.x)
+
+        if self._fix_edge_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self._fix_edge_id)
+
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index, neg_edge_type = self.sample_neg_edges(
@@ -128,6 +133,10 @@ class KGEModule(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x = self.fusion_fn(x=batch.x)
+
+        if self._fix_edge_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self._fix_edge_id)
+
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index, neg_edge_type = self.sample_neg_edges(
@@ -164,6 +173,10 @@ class KGEModule(LightningModule):
 
     def test_step(self, batch, batch_idx):
         x = self.fusion_fn(x=batch.x)
+
+        if self._fix_edge_id is not None:
+            batch.edge_type = torch.full_like(batch.edge_type, self._fix_edge_id)
+
         z = self.model.encode(x, batch.edge_index, batch.edge_type)
 
         neg_edge_index, neg_edge_type = self.sample_neg_edges(
@@ -225,3 +238,11 @@ class KGEModule(LightningModule):
         self._edge_index_map = edge_mapping_dict
         self.edge_wise_pre_valid = EdgeWisePrecision(class_mapping=self._edge_index_map)
         self.edge_wise_pre_test = EdgeWisePrecision(class_mapping=self._edge_index_map)
+
+    @property
+    def fix_edge_id(self):
+        return self._fix_edge_id
+
+    @fix_edge_id.setter
+    def fix_edge_id(self, edge_id: int):
+        self._fix_edge_id = edge_id

@@ -1,4 +1,4 @@
-from .biokg import BioKG
+from .dpi import DPI
 from .primekg import PrimeKG
 
-__all__ = ["BioKG", "PrimeKG"]
+__all__ = ["DPI", "PrimeKG"]

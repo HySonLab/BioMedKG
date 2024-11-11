@@ -6,13 +6,17 @@ from biomedkg.data import dataset, node
 
 
 def get_node_encode_method(
-    node_init_method: str, embed_dim: int, model_name: str, fuse_method: str
+    node_init_method: str,
+    embed_dim: int,
+    model_name: str,
+    fuse_method: str,
+    modality_config_path: str,
 ):
     if node_init_method is None or node_init_method == "random":
         return node.RandomEncode(embed_dim=embed_dim)
     elif node_init_method == "lm":
         return node.LMMultiModalsEncode(
-            config_file="configs/lm_modality/primekg_modality.yaml", embed_dim=embed_dim
+            config_file=modality_config_path, embed_dim=embed_dim
         )
     elif node_init_method == "gcl":
         return node.GCLEncode(
@@ -46,6 +50,7 @@ class PrimeKGModule(LightningDataModule):
             embed_dim=embed_dim,
             model_name=gcl_model,
             fuse_method=gcl_fuse_method,
+            modality_config_path="configs/lm_modality/primekg_modality.yaml",
         )
 
     def setup(self, stage: str = "split"):
@@ -107,7 +112,7 @@ class PrimeKGModule(LightningDataModule):
         )
 
 
-class BioKGModule(LightningDataModule):
+class DPIModule(LightningDataModule):
     def __init__(
         self,
         data_dir: str,
@@ -116,6 +121,8 @@ class BioKGModule(LightningDataModule):
         val_ratio: float,
         test_ratio: float,
         node_init_method: str = None,
+        gcl_model: str = None,
+        gcl_fuse_method: str = None,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -125,13 +132,17 @@ class BioKGModule(LightningDataModule):
         self.batch_size = batch_size
 
         self.encoder = get_node_encode_method(
-            node_init_method=node_init_method, embed_dim=embed_dim
+            node_init_method=node_init_method,
+            embed_dim=embed_dim,
+            model_name=gcl_model,
+            fuse_method=gcl_fuse_method,
+            modality_config_path="configs/lm_modality/dpi_modality.yaml",
         )
 
     def setup(self, stage: str = "split"):
-        self.biokg = dataset.BioKG(data_dir=self.data_dir, encoder=self.encoder)
-        self.edge_map_index = self.biokg.edge_map_index
-        self.data = self.biokg.data
+        self.dpi = dataset.DPI(data_dir=self.data_dir, encoder=self.encoder)
+        self.edge_map_index = self.dpi.edge_map_index
+        self.data = self.dpi.data
 
         if stage == "split":
             self.train_data, self.val_data, self.test_data = T.RandomLinkSplit(

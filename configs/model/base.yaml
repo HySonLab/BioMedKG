@@ -1,0 +1,4 @@
+scheduler_type: "cosine"
+learning_rate: 0.001
+warm_up_ratio: 0.2
+fuse_method: "none"

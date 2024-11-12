@@ -1,0 +1,7 @@
+_target_: "biomedkg.data_module.DPIModule"
+data_dir: "./data/dpi/new_dpi.csv"
+embed_dim: 768
+batch_size: 128
+val_ratio: 0.2
+test_ratio: 0.2
+node_init_method: "random"

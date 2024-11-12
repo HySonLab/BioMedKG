@@ -1,0 +1,8 @@
+_target_: "biomedkg.data_module.PrimeKGModule"
+data_dir: "./data/primekg"
+embed_dim: 768
+node_type: ["gene/protein", "drug", "disease"]
+batch_size: 128
+val_ratio: 0.2
+test_ratio: 0.2
+node_init_method: "random" # gcl, lm, random

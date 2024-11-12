@@ -1,0 +1,8 @@
+defaults:
+  - base
+
+model_name: "ggd" # dgi, grace, ggd
+in_dim: 768
+hidden_dim: 256
+out_dim: 256
+num_hidden_layers: 2

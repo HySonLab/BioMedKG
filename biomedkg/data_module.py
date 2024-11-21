@@ -1,6 +1,6 @@
 import torch_geometric.transforms as T
 from lightning import LightningDataModule
-from torch_geometric.loader import NeighborLoader
+from torch_geometric.loader import GraphSAINTRandomWalkSampler, NeighborLoader
 
 from biomedkg.data import dataset, node
 
@@ -86,22 +86,44 @@ class PrimeKGModule(LightningDataModule):
             num_workers=0,
         )
 
-    def train_dataloader(self):
-        return NeighborLoader(
-            data=self.train_data,
-            batch_size=self.batch_size,
-            num_neighbors=[30] * 3,
-            num_workers=0,
-            shuffle=True,
-        )
+    def train_dataloader(self, loader_type: str = "neighbor"):
+        assert loader_type in ["neighbor", "saint"]
 
-    def val_dataloader(self):
-        return NeighborLoader(
-            data=self.val_data,
-            batch_size=self.batch_size,
-            num_neighbors=[30] * 3,
-            num_workers=0,
-        )
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.train_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+                shuffle=True,
+            )
+        elif loader_type == "saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.train_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=1000,
+                num_workers=0,
+            )
+
+    def val_dataloader(self, loader_type: str = "neighbor"):
+        assert loader_type in ["neighbor", "saint"]
+
+        if loader_type == "neighbor":
+            return NeighborLoader(
+                data=self.val_data,
+                batch_size=self.batch_size,
+                num_neighbors=[30] * 3,
+                num_workers=0,
+            )
+        elif loader_type == "saint":
+            return GraphSAINTRandomWalkSampler(
+                data=self.val_data,
+                batch_size=self.batch_size,
+                walk_length=10,
+                num_steps=100,
+                num_workers=0,
+            )
 
     def test_dataloader(self):
         return NeighborLoader(

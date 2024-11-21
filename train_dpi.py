@@ -94,8 +94,8 @@ def main(cfg: DictConfig):
 
     trainer.fit(
         model=model,
-        train_dataloaders=data_module.train_dataloader(),
-        val_dataloaders=data_module.val_dataloader(),
+        train_dataloaders=data_module.train_dataloader(loader_type="saint"),
+        val_dataloaders=data_module.val_dataloader(loader_type="saint"),
     )
 
     test_args = {

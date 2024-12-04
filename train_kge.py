@@ -93,7 +93,7 @@ def main(cfg: DictConfig):
 
     test_args = {
         "model": model,
-        "dataloaders": data_module.test_dataloader(),
+        "dataloaders": data_module.test_dataloader(loader_type="saint"),
     }
 
     if not cfg.debug:

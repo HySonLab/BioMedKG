@@ -55,6 +55,8 @@ class TripletBase:
             # Get the embedding for that node
             embedding = self.encoder(lst_node_name)
 
+            print(f"Random Init node ratio is {self.encoder.random_init_ratio}")
+
             node_type = clean_name(node_type)
             data[node_type].x = embedding
 

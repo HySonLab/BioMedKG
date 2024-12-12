@@ -175,7 +175,7 @@ class DPIModule(LightningDataModule):
     def setup(self, stage: str = "split"):
         self.dpi = dataset.DPI(data_dir=self.data_dir, encoder=self.encoder)
         self.edge_map_index = self.dpi.edge_map_index
-        self.data = self.dpi.data
+        self.data = T.ToUndirected()(self.dpi.data)
 
         if stage == "split":
             self.train_data, self.val_data, self.test_data = T.RandomLinkSplit(

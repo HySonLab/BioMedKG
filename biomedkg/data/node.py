@@ -23,17 +23,21 @@ class LMMultiModalsEncode:
         self.embed_dim = embed_dim
         self.batch_size = batch_size
         self.node_mapping = self.load()
+        self.random_init_ratio = 0
 
     def __call__(self, lst_node: List[str]) -> torch.Tensor:
+        random_init = 0
         node_embedding = []
 
         for node_name in lst_node:
             embedding = self.node_mapping.get(node_name, None)
             if embedding is None:
                 embedding = torch.nn.init.xavier_normal_(torch.empty(2, self.embed_dim))
+                random_init += 1
             node_embedding.append(torch.tensor(embedding))
 
         node_embedding = torch.stack(node_embedding, dim=0)
+        self.random_init_ratio = random_init / len(lst_node)
         return node_embedding.to(torch.float)
 
     def load(self) -> dict[str, np.array]:
@@ -137,6 +141,7 @@ class RandomEncode:
         embed_dim: int = 768,
     ):
         self.embed_dim = embed_dim
+        self.random_init_ratio = 1
 
     def __call__(self, lst_node: List[str]) -> torch.Tensor:
         node_embedding = torch.nn.init.xavier_normal_(
@@ -161,16 +166,20 @@ class GCLEncode:
             self.data_gcl, f"{model_name}_{fuse_method}.pickle"
         )
         self.node_mapping = self.load()
+        self.random_init_ratio = 0
 
     def __call__(self, lst_node: List[str]) -> torch.Tensor:
         node_embedding = []
+        random_init = 0
         for node_name in lst_node:
             embedding = self.node_mapping.get(node_name, None)
             if embedding is None:
                 embedding = torch.nn.init.xavier_normal_(torch.empty(1, self.embed_dim))
+                random_init += 1
             node_embedding.append(torch.tensor(embedding))
 
         node_embedding = torch.stack(node_embedding, dim=0)
+        self.random_init_ratio = random_init / len(lst_node)
         return node_embedding
 
     def load(self) -> dict[str, np.array]:

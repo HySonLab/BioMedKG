@@ -14,3 +14,4 @@ debug: false
 neg_ratio: 10
 gcl_model: "ggd" # dgi, grace, ggd
 gcl_fuse_method: "attention" # attention, redaf
+pretrained_path: ""

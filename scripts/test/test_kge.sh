@@ -3,7 +3,6 @@
 ENCODER="rgcn"                  # rgcn, rgat
 DECODER="dismult"               # transe, dismult, complex
 NODE_INIT_METHOD="random"       # gcl, lm, random
-PRETRAINED_PATH=""              # Path to kge model ends with .ckpt
 
 # Set INIT_DIM based on NODE_INIT_METHOD
 if [[ "$NODE_INIT_METHOD" == "random" || "$NODE_INIT_METHOD" == "lm" ]]; then
@@ -18,13 +17,13 @@ GCL_MODEL="ggd"                 # dgi, grace, ggd (use if the node_init_method i
 GCL_FUSE_METHOD="attention"     # attention, redaf, none (use if the node_init_method is gcl)
 
 EPOCHS=100
-NEG_RATIO=1
-BATCH_SIZE=64
+NEG_RATIO=10
+BATCH_SIZE=16
 DEVICES="[0]"
 LEARNING_RATE=0.001
 
 # Run the Python training script with specified parameters
-python3 train_dpi.py \
+python3 train_kge.py \
     devices=$DEVICES \
     epochs=$EPOCHS \
     neg_ratio=$NEG_RATIO \
@@ -38,4 +37,4 @@ python3 train_dpi.py \
     model.fuse_method=$FUSE_METHOD \
     model.encoder_name=$ENCODER \
     model.decoder_name=$DECODER \
-    pretrained_path=$PRETRAINED_PATH
+    debug=true

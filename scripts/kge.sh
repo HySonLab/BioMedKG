@@ -17,8 +17,8 @@ GCL_MODEL="ggd"                 # dgi, grace, ggd (use if the node_init_method i
 GCL_FUSE_METHOD="attention"     # attention, redaf, none (use if the node_init_method is gcl)
 
 EPOCHS=100
-NEG_RATIO=10
-BATCH_SIZE=16
+NEG_RATIO=1
+BATCH_SIZE=64
 DEVICES="[0]"
 LEARNING_RATE=0.001
 

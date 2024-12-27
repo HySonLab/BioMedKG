@@ -17,9 +17,9 @@ FUSE_METHOD="none"              # attention, redaf, none (use if the node_init_m
 GCL_MODEL="ggd"                 # dgi, grace, ggd (use if the node_init_method is gcl)
 GCL_FUSE_METHOD="attention"     # attention, redaf, none (use if the node_init_method is gcl)
 
-EPOCHS=100
-NEG_RATIO=1
-BATCH_SIZE=64
+EPOCHS=1
+NEG_RATIO=10
+BATCH_SIZE=8
 DEVICES="[0]"
 LEARNING_RATE=0.001
 
@@ -38,4 +38,5 @@ python3 train_dpi.py \
     model.fuse_method=$FUSE_METHOD \
     model.encoder_name=$ENCODER \
     model.decoder_name=$DECODER \
-    pretrained_path=$PRETRAINED_PATH
+    pretrained_path=$PRETRAINED_PATH    \
+    debug=true

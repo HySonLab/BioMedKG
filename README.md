@@ -1,6 +1,6 @@
-# Biomedical Knowledge Graph
+# Multimodal Contrastive Representation Learning in Augmented Biomedical Knowledge Graphs
 
-<img src="assets/framework_overview.png" alt="Framework overview" width="75%"/>
+<img src="assets/framework_overview.png" alt="Framework overview" width="100%"/>
 
 ## Setup
 

@@ -1,5 +1,5 @@
 gene/protein:
-  file_name: data/dpi/drug_bank_with_protein_attributes.csv
+  file_name: data/dpi/dpi_gene.csv
   idetifier_column: Gene Name
   modality_columns:
     - gene_sequence
@@ -8,7 +8,7 @@ gene/protein:
     - unikei/bert-base-proteins
     - dmis-lab/biobert-v1.1
 drug:
-  file_name: data/dpi/new_drugbank_feature_base.csv
+  file_name: data/dpi/dpi_drug.csv
   idetifier_column: generic_name
   modality_columns:
     - smiles

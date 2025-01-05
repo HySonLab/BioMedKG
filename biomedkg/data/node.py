@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from biomedkg import data_module, gcl_module
 from biomedkg.data.embed import NodeEmbedding
+from biomedkg.kge_module import KGEModule
 
 
 class LMMultiModalsEncode:
@@ -235,6 +236,95 @@ class GCLEncode:
                     out = out.detach().cpu().numpy()[: batch.batch_size]
 
                 node_mapping[nodes] = out
+
+        with open(self.artifact_path, "wb") as file:
+            pickle.dump(node_mapping, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+class KGEEncode:
+    def __init__(
+        self,
+        ckpt_path: str,
+        node_init_method: str,
+        gcl_model: str,
+        gcl_fuse_method: str,
+        out_dim: int = 256,
+    ):
+        self.ckpt_path = ckpt_path
+        self.node_init_method = node_init_method
+        self.gcl_model = gcl_model
+        self.gcl_fuse_method = gcl_fuse_method
+        self.out_dim = out_dim
+
+        save_dir = os.path.join("data", "kge_embed")
+        os.makedirs(save_dir, exist_ok=True)
+
+        save_file_name = "_".join(ckpt_path.split("/")[-2:]).split(".")[0]
+        self.artifact_path = os.path.join(save_dir, save_file_name)
+
+        self.node_mapping = self.load()
+
+    def __call__(self, lst_node: List[str]) -> torch.Tensor:
+        node_embedding = []
+        for node_name in lst_node:
+            embedding = self.node_mapping.get(node_name, None)
+            if embedding is None:
+                embedding = torch.nn.init.xavier_normal_(torch.empty(1, self.out_dim))
+            node_embedding.append(torch.tensor(embedding))
+
+        node_embedding = torch.stack(node_embedding, dim=0)
+
+        return node_embedding
+
+    def load(
+        self,
+    ):
+        if not os.path.exists(self.artifact_path):
+            self._get_embeddings()
+        with open(self.artifact_path, "rb") as file:
+            node_embedding = pickle.load(file)
+        return node_embedding
+
+    def _get_embeddings(self):
+        node_mapping = dict()
+
+        if not os.path.exists(self.ckpt_path):
+            raise FileNotFoundError
+
+        model = KGEModule.load_from_checkpoint(self.ckpt_path)
+
+        if self.node_init_method in ["random", "lm"]:
+            in_dim = 768
+        else:
+            in_dim = 256
+
+        self.embed_dim = in_dim
+
+        data_args = {
+            "data_dir": "./data/primekg",
+            "embed_dim": in_dim,
+            "node_type": ["gene/protein", "drug", "disease"],
+            "batch_size": 64,
+            "val_ratio": 0.2,
+            "test_ratio": 0.2,
+            "node_init_method": self.node_init_method,
+            "gcl_model": self.gcl_model,
+            "gcl_fuse_method": self.gcl_fuse_method,
+        }
+
+        data = data_module.PrimeKGModule(**data_args)
+        data.setup()
+
+        node_list = data.primekg.node_list
+        dataloader = data.subgraph_dataloader()
+
+        for nodes, batch in tqdm(zip(node_list, dataloader), total=len(dataloader)):
+            batch = batch.to(model.device)
+            with torch.no_grad():
+                out = model(batch.x, batch.edge_index, batch.edge_type)
+                out = out.detach().cpu().numpy()[: batch.batch_size]
+
+            node_mapping[nodes] = out
 
         with open(self.artifact_path, "wb") as file:
             pickle.dump(node_mapping, file, protocol=pickle.HIGHEST_PROTOCOL)

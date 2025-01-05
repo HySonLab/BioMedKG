@@ -5,7 +5,7 @@ requires-python = ">=3.9"
 dependencies = [
     "pydantic_settings==2.2.1","tqdm==4.65.0", "PyTDC", "torch_geometric==2.5.3",
     "einops==0.8.0", "transformers==4.39.0","lightning==2.2.3", "hydra-core==1.3.2",
-    "PyGCL==0.1.2", "comet-ml==3.41.0",
+    "PyGCL==0.1.2", "comet-ml==3.41.0", "xgboost==2.1.3"
 ]
 
 [tool.setuptools.packages.find]

@@ -20,9 +20,7 @@ def main(cfg: DictConfig):
     print("=" * 20)
 
     model = KGEModule.load_from_checkpoint(cfg.pretrained_path)
-    model.fix_edge_id = (
-        1  # Because in PrimeKG, 1 is the index of protein-drug relationship
-    )
+
     model.neg_ratio = cfg.neg_ratio
 
     model.edge_mapping = data_module.edge_map_index

@@ -104,7 +104,7 @@ class KGEModule(LightningModule):
     def forward(self, x, edge_index, edge_type):
         x = self.fusion_fn(x=x)
 
-        return self.encoder(x, edge_index, edge_type)
+        return self.model.encode(x, edge_index, edge_type)
 
     def training_step(self, batch):
         x = self.fusion_fn(x=batch.x)

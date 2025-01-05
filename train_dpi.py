@@ -4,7 +4,7 @@ import time
 import hydra
 from hydra.utils import instantiate
 from lightning.pytorch import Trainer, seed_everything
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import CometLogger
 from omegaconf import DictConfig
 
@@ -33,6 +33,7 @@ def main(cfg: DictConfig):
         model.fix_edge_id = (
             1  # Because in PrimeKG, 1 is the index of protein-drug relationship
         )
+        model.neg_ratio = cfg.neg_ratio
 
     model.edge_mapping = data_module.edge_map_index
 
@@ -42,8 +43,8 @@ def main(cfg: DictConfig):
     if cfg.data.node_init_method == "gcl":
         exp_name = exp_name + f"{cfg.gcl_model}_{cfg.gcl_fuse_method}"
     exp_name = exp_name + str(int(time.time()))
-    ckpt_dir = os.path.join(cfg.ckpt_dir, "kge", exp_name)
-    log_dir = os.path.join(cfg.log_dir, "kge", exp_name)
+    ckpt_dir = os.path.join(cfg.ckpt_dir, "dpi", exp_name)
+    log_dir = os.path.join(cfg.log_dir, "dpi", exp_name)
 
     os.makedirs(ckpt_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
@@ -67,13 +68,9 @@ def main(cfg: DictConfig):
         save_last=True,
     )
 
-    early_stopping = EarlyStopping(
-        monitor="val_AUROC_mean", mode="max", min_delta=0.001, patience=1
-    )
-
     logger = CometLogger(
         api_key=find_comet_api_key(),
-        project_name="BioMedKG-KGE",
+        project_name="BioMedKG-DPI",
         save_dir=log_dir,
         experiment_name=exp_name,
     )
@@ -84,7 +81,7 @@ def main(cfg: DictConfig):
             "check_val_every_n_epoch": cfg.val_every_epoch,
             "enable_checkpointing": True,
             "gradient_clip_val": 1.0,
-            "callbacks": [checkpoint_callback, early_stopping],
+            "callbacks": [checkpoint_callback],
             "default_root_dir": ckpt_dir,
             "logger": logger,
         }

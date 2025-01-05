@@ -4,7 +4,7 @@ import time
 import hydra
 from hydra.utils import instantiate
 from lightning.pytorch import Trainer, seed_everything
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import CometLogger
 from omegaconf import DictConfig
 
@@ -60,10 +60,6 @@ def main(cfg: DictConfig):
         save_last=True,
     )
 
-    early_stopping = EarlyStopping(
-        monitor="val_AUROC_mean", mode="max", min_delta=0.001, patience=1
-    )
-
     logger = CometLogger(
         api_key=find_comet_api_key(),
         project_name="BioMedKG-KGE",
@@ -77,7 +73,7 @@ def main(cfg: DictConfig):
             "check_val_every_n_epoch": cfg.val_every_epoch,
             "enable_checkpointing": True,
             "gradient_clip_val": 1.0,
-            "callbacks": [checkpoint_callback, early_stopping],
+            "callbacks": [checkpoint_callback],
             "default_root_dir": ckpt_dir,
             "logger": logger,
         }

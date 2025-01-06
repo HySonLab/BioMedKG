@@ -111,3 +111,17 @@ huggingface-cli download tienda02/BioMedKG --repo-type=model --local-dir ./ckpt
 ```
 
 Then, set the `PRETRAINED_PATH` variable in the test scripts to the downloaded checkpoint.
+
+## Please cite our work!
+
+```bibtex
+@misc{dang2025multimodalcontrastiverepresentationlearning,
+      title={Multimodal Contrastive Representation Learning in Augmented Biomedical Knowledge Graphs}, 
+      author={Tien Dang and Viet Thanh Duy Nguyen and Minh Tuan Le and Truong-Son Hy},
+      year={2025},
+      eprint={2501.01644},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2501.01644}, 
+}
+```

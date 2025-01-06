@@ -1,4 +1,6 @@
-# Biomedical Knowledge Graph
+# Multimodal Contrastive Representation Learning in Augmented Biomedical Knowledge Graphs
+
+Paper: https://arxiv.org/abs/2501.01644
 
 ## Abstract
 
@@ -112,16 +114,30 @@ huggingface-cli download tienda02/BioMedKG --repo-type=model --local-dir ./ckpt
 
 Then, set the `PRETRAINED_PATH` variable in the test scripts to the downloaded checkpoint.
 
+## Acknowledgment
+
+- This project builds upon the PrimeKG dataset introduced in the paper:
+
+  **[Building a knowledge graph to enable precision medicine](https://www.nature.com/articles/s41597-023-01960-3)**
+  _Chandak, Payal and Huang, Kexin and Zitnik, Marinka_.
+  Published in _Nature Scientific Data_, 2023.
+
+- This project leverages the **DrugBank** drug-target interaction dataset:
+
+  **[Drugbank 6.0: the drugbank knowledgebasefor 2024.](https://academic.oup.com/nar/article/52/D1/D1265/7416367)**
+  _Craig Knox, Mike Wilson, Christen M Klinger, et al._
+  Published in _Nucleic Acids Research_, 2023.
+
 ## Please cite our work!
 
 ```bibtex
 @misc{dang2025multimodalcontrastiverepresentationlearning,
-      title={Multimodal Contrastive Representation Learning in Augmented Biomedical Knowledge Graphs}, 
+      title={Multimodal Contrastive Representation Learning in Augmented Biomedical Knowledge Graphs},
       author={Tien Dang and Viet Thanh Duy Nguyen and Minh Tuan Le and Truong-Son Hy},
       year={2025},
       eprint={2501.01644},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2501.01644}, 
+      url={https://arxiv.org/abs/2501.01644},
 }
 ```

@@ -1,6 +1,8 @@
 # Multimodal Contrastive Representation Learning in Augmented Biomedical Knowledge Graphs
 
-Paper: https://arxiv.org/abs/2501.01644
+Paper: https://www.frontiersin.org/journals/systems-biology/articles/10.3389/fsysb.2025.1651930/full
+
+Preprint: https://arxiv.org/abs/2501.01644
 
 * Accepted for publication at Frontiers in Systems Biology
 * Presented at BIOKDD 2025 in Toronto, Canada
@@ -132,6 +134,28 @@ Then, set the `PRETRAINED_PATH` variable in the test scripts to the downloaded c
   Published in _Nucleic Acids Research_, 2023.
 
 ## Please cite our work!
+
+```bibtex
+@ARTICLE{10.3389/fsysb.2025.1651930,
+  
+AUTHOR={Dang, Tien  and Nguyen, Viet Thanh Duy  and Le, Minh Tuan  and Hy, Truong-Son },
+         
+TITLE={BioMedKG: multimodal contrastive representation learning in augmented BioMedical knowledge graphs},
+        
+JOURNAL={Frontiers in Systems Biology},
+        
+VOLUME={Volume 5 - 2025},
+
+YEAR={2025},
+
+URL={https://www.frontiersin.org/journals/systems-biology/articles/10.3389/fsysb.2025.1651930},
+
+DOI={10.3389/fsysb.2025.1651930},
+
+ISSN={2674-0702},
+
+ABSTRACT={Biomedical Knowledge Graphs (BKGs) integrate diverse datasets to elucidate complex relationships within the biomedical field. Effective link prediction on these graphs can uncover valuable connections, such as potential new drug-disease relations. We introduce a novel multimodal approach that unifies embeddings from specialized Language Models (LMs) with Graph Contrastive Learning (GCL) to enhance intra-entity relationships while employing a Knowledge Graph Embedding (KGE) model to capture inter-entity relationships for effective link prediction. To address limitations in existing BKGs, we present PrimeKG++, an enriched knowledge graph incorporating multimodal data, including biological sequences and textual descriptions for each entity type. By combining semantic and relational information in a unified representation, our approach demonstrates strong generalizability, enabling accurate link predictions even for unseen nodes. Experimental results in PrimeKG++ and the DrugBank drug-target interaction dataset demonstrate the effectiveness and robustness of our method in diverse biomedical datasets. Our source code, pre-trained models, and data are publicly available at https://github.com/HySonLab/BioMedKG.}}
+```
 
 ```bibtex
 @misc{dang2025multimodalcontrastiverepresentationlearning,
